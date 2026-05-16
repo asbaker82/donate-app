@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Donate App",
-    "slug": "donate-app",
+    "name": "Yoink It",
+    "slug": "yoink-it",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "donateapp",
+    "scheme": "yoinkit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -17,7 +17,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.asbaker.donateapp",
+      "package": "com.asbaker.yoinkit",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"

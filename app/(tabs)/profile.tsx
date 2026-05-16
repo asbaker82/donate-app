@@ -15,7 +15,7 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     const doLogout = () => logout();
     if (Platform.OS === 'web') {
-      if (window.confirm('Sign out of Donate App?')) doLogout();
+      if (window.confirm('Sign out of Yoink It?')) doLogout();
     } else {
       Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
         { text: 'Cancel', style: 'cancel' },
@@ -34,7 +34,6 @@ export default function ProfileScreen() {
     { label: 'Listed', value: myItems.length, icon: 'gift' as const, color: '#10B981', filter: 'listed' as const },
     { label: 'Active', value: myItems.filter(i => i.status === 'available' || i.status === 'claimed').length, icon: 'check-circle' as const, color: '#3182ce', filter: 'active' as const },
     { label: 'Claimed by You', value: items.filter(i => i.claimedBy === currentUser.id).length, icon: 'hand-o-right' as const, color: '#d69e2e', filter: 'claimed' as const },
-    { label: 'Friends', value: friendList.length, icon: 'users' as const, color: '#805ad5', filter: null },
   ];
 
   return (
@@ -105,7 +104,7 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Friends</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{friendList.length} Friends</Text>
           <Pressable
             style={({ pressed }) => [styles.addFriendsBtn, pressed && { opacity: 0.7 }]}
             onPress={() => router.push('/add-friends')}
@@ -206,17 +205,7 @@ export default function ProfileScreen() {
                 <Pressable
                   style={styles.alertIconBtn}
                   hitSlop={8}
-                  onPress={() => {
-                    const doDelete = () => deleteSearchNotification(notif.id);
-                    if (Platform.OS === 'web') {
-                      if (window.confirm(`Delete alert for "${notif.keyword}"?`)) doDelete();
-                    } else {
-                      Alert.alert('Delete Alert', `Delete alert for "${notif.keyword}"?`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: doDelete },
-                      ]);
-                    }
-                  }}
+                  onPress={() => deleteSearchNotification(notif.id)}
                 >
                   <FontAwesome name="trash" size={14} color="#e53e3e" />
                 </Pressable>

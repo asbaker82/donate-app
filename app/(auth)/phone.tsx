@@ -51,7 +51,7 @@ export default function PhoneScreen() {
           <View style={styles.logo}>
             <Text style={styles.logoText}>D</Text>
           </View>
-          <Text style={styles.title}>Welcome to Donate App</Text>
+          <Text style={styles.title}>Welcome to Yoink It</Text>
           <Text style={styles.subtitle}>
             Enter your mobile number to get started. We'll send a verification code.
           </Text>

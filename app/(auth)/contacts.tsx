@@ -96,8 +96,8 @@ export default function ContactsScreen() {
         <Text style={styles.title}>Find your friends</Text>
         <Text style={styles.subtitle}>
           {Platform.OS === 'web'
-            ? 'People already on Donate App:'
-            : 'Your contacts who are already on Donate App:'}
+            ? 'People already on Yoink It:'
+            : 'Your contacts who are already on Yoink It:'}
         </Text>
       </View>
 
@@ -106,7 +106,7 @@ export default function ContactsScreen() {
       ) : suggested.length === 0 ? (
         <View style={styles.emptyState}>
           <FontAwesome name="users" size={40} color="#e2e8f0" />
-          <Text style={styles.emptyTitle}>None of your contacts are on Donate App yet</Text>
+          <Text style={styles.emptyTitle}>None of your contacts are on Yoink It yet</Text>
           <Text style={styles.emptySubtitle}>You can add friends later from your profile.</Text>
         </View>
       ) : (

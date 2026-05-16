@@ -38,7 +38,7 @@ export default function NameScreen() {
           </View>
           <Text style={styles.title}>What's your name?</Text>
           <Text style={styles.subtitle}>
-            This is how your friends will see you on Donate App.
+            This is how your friends will see you on Yoink It.
           </Text>
         </View>
 

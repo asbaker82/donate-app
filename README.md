@@ -1,4 +1,4 @@
-# Donate App
+# Yoink It
 
 A React Native / Expo app for sharing household items with friends. Donors post items they no longer need with a disposal deadline; friends claim, waitlist, and arrange pickup before the item goes to charity.
 

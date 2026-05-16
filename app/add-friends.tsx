@@ -34,7 +34,7 @@ export default function AddFriendsScreen() {
       // Web: can't read contacts — show all app users
       setSections([
         {
-          title: 'People on Donate App',
+          title: 'People on Yoink It',
           subtitle: 'Add contacts on your phone to see who\'s already here.',
           data: allCandidates,
         },
@@ -50,7 +50,7 @@ export default function AddFriendsScreen() {
 
       if (status !== 'granted') {
         setSections([{
-          title: 'People on Donate App',
+          title: 'People on Yoink It',
           subtitle: 'Allow contact access in Settings to see which friends are already here.',
           data: allCandidates,
         }]);
@@ -78,13 +78,13 @@ export default function AddFriendsScreen() {
       if (fromContacts.length > 0) {
         built.push({
           title: 'From Your Contacts',
-          subtitle: 'These people are in your phone\'s contacts and already on Donate App.',
+          subtitle: 'These people are in your phone\'s contacts and already on Yoink It.',
           data: fromContacts,
         });
       }
       if (others.length > 0) {
         built.push({
-          title: 'Others on Donate App',
+          title: 'Others on Yoink It',
           subtitle: fromContacts.length > 0 ? 'Other app users not in your contacts.' : undefined,
           data: others,
         });
@@ -94,7 +94,7 @@ export default function AddFriendsScreen() {
       }
       setSections(built);
     } catch {
-      setSections([{ title: 'People on Donate App', data: allCandidates }]);
+      setSections([{ title: 'People on Yoink It', data: allCandidates }]);
     } finally {
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function AddFriendsScreen() {
           <Text style={styles.emptySubtitle}>
             {contactsPermission === 'denied'
               ? 'Allow contact access in Settings so we can find your friends.'
-              : 'Invite your friends to join Donate App!'}
+              : 'Invite your friends to join Yoink It!'}
           </Text>
         </View>
       ) : (

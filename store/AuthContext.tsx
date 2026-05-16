@@ -3,10 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from './types';
 import { MOCK_USERS } from './mockData';
 
-const STORAGE_KEY_CURRENT    = '@donate_app/auth_user';
-const STORAGE_KEY_REGISTERED = '@donate_app/registered_users';
+const STORAGE_KEY_CURRENT    = '@yoink_it/auth_user';
+const STORAGE_KEY_REGISTERED = '@yoink_it/registered_users';
 // Profile photo stored separately so it never bloats the user JSON arrays.
-const STORAGE_KEY_PHOTO      = '@donate_app/profile_photo';
+const STORAGE_KEY_PHOTO      = '@yoink_it/profile_photo';
 
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');

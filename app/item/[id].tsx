@@ -79,6 +79,7 @@ export default function ItemDetailScreen() {
   const [claimDeadlineDate, setClaimDeadlineDate] = useState<Date | null>(null);
   const [showWaitlistToast, setShowWaitlistToast] = useState(false);
   const [showReleaseSheet, setShowReleaseSheet] = useState(false);
+  const [showLeaveWaitlistSheet, setShowLeaveWaitlistSheet] = useState(false);
   const [smsVisible, setSmsVisible] = useState(false);
   const [smsMessage, setSmsMessage] = useState('');
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
@@ -364,7 +365,7 @@ export default function ItemDetailScreen() {
         )}
 
         {!isMyItem && isOnWaitlist && (
-          <Pressable style={styles.ghostBtn} onPress={() => leaveWaitlist(item.id)}>
+          <Pressable style={styles.ghostBtn} onPress={() => setShowLeaveWaitlistSheet(true)}>
             <FontAwesome name="times" size={15} color="#718096" style={{ marginRight: 8 }} />
             <Text style={styles.ghostBtnText}>Leave Waitlist</Text>
           </Pressable>
@@ -423,6 +424,18 @@ export default function ItemDetailScreen() {
       <WaitlistToast
         visible={showWaitlistToast}
         onComplete={() => setShowWaitlistToast(false)}
+      />
+
+      {/* Leave waitlist confirmation sheet */}
+      <ConfirmSheet
+        visible={showLeaveWaitlistSheet}
+        title="Leave the Waitlist?"
+        message="You'll lose your spot. If a claim opens up, you won't be offered the item."
+        confirmLabel="Leave Waitlist"
+        cancelLabel="Stay on Waitlist"
+        destructive
+        onConfirm={() => { setShowLeaveWaitlistSheet(false); leaveWaitlist(item.id); }}
+        onCancel={() => setShowLeaveWaitlistSheet(false)}
       />
 
       {/* Release claim confirmation sheet */}

@@ -16,46 +16,34 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/store/AuthContext';
 import { useApp } from '@/store/AppContext';
 import AddressInput from '@/components/AddressInput';
+import ImageCropModal from '@/components/ImageCropModal';
 import { ItemVisibility } from '@/store/types';
 
-// Compress a data URL to ~15 KB so it fits in localStorage on web.
-async function compressDataUrl(dataUrl: string, maxDim = 180, quality = 0.55): Promise<string> {
-  return new Promise(resolve => {
-    const img = new window.Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
 
-// Convert a blob/object URL to a data URL, then compress.
-async function blobUrlToCompressedDataUrl(uri: string): Promise<string> {
-  const resp = await fetch(uri);
-  const blob = await resp.blob();
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      resolve(await compressDataUrl(reader.result as string));
-    };
-    reader.readAsDataURL(blob);
-  });
-}
 
 async function pickImage(): Promise<string | null> {
+  // On web, use a file input directly — expo-image-picker permissions are unreliable in browsers.
+  if (Platform.OS === 'web') {
+    return new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    });
+  }
+
   try {
     const ImagePicker = await import('expo-image-picker');
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
-      }
+      Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
       return null;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -65,12 +53,7 @@ async function pickImage(): Promise<string | null> {
       quality: 0.7,
     });
     if (result.canceled) return null;
-    const uri = result.assets[0].uri;
-    // On web the URI is a blob URL — convert and compress for localStorage.
-    if (Platform.OS === 'web') {
-      return await blobUrlToCompressedDataUrl(uri);
-    }
-    return uri;
+    return result.assets[0].uri;
   } catch {
     return null;
   }
@@ -91,6 +74,7 @@ export default function EditProfileScreen() {
   const [nameError, setNameError] = useState('');
   const [saving, setSaving] = useState(false);
   const [pickingPhoto, setPickingPhoto] = useState(false);
+  const [cropUri, setCropUri] = useState<string | null>(null);
 
   const initials = name.trim()
     ? name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -100,7 +84,13 @@ export default function EditProfileScreen() {
     setPickingPhoto(true);
     const uri = await pickImage();
     setPickingPhoto(false);
-    if (uri) setProfilePhoto(uri);
+    if (!uri) return;
+    if (Platform.OS === 'web') {
+      // Show crop modal on web; native expo-image-picker already crops
+      setCropUri(uri);
+    } else {
+      setProfilePhoto(uri);
+    }
   };
 
   const handleRemovePhoto = () => {
@@ -127,6 +117,7 @@ export default function EditProfileScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
       {/* Profile photo */}
@@ -274,6 +265,16 @@ export default function EditProfileScreen() {
         }
       </Pressable>
     </ScrollView>
+
+    {cropUri && (
+      <ImageCropModal
+        imageUri={cropUri}
+        visible={!!cropUri}
+        onConfirm={dataUrl => { setProfilePhoto(dataUrl); setCropUri(null); }}
+        onCancel={() => setCropUri(null)}
+      />
+    )}
+    </View>
   );
 }
 
