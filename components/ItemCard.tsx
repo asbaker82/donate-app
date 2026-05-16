@@ -7,9 +7,10 @@ import { useApp } from '@/store/AppContext';
 interface Props {
   item: Item;
   onPress: () => void;
+  distance?: number; // miles from user's address
 }
 
-export default function ItemCard({ item, onPress }: Props) {
+export default function ItemCard({ item, onPress, distance }: Props) {
   const { getUserById } = useApp();
   const donor = getUserById(item.donorId);
 
@@ -56,16 +57,26 @@ export default function ItemCard({ item, onPress }: Props) {
             <FontAwesome name="map-marker" size={12} color="#718096" style={{ marginRight: 4 }} />
             <Text style={styles.footerText} numberOfLines={1}>{item.pickupLocation}</Text>
           </View>
-          <View style={[styles.timeChip, isUrgent && styles.timeChipUrgent]}>
-            <FontAwesome
-              name="clock-o"
-              size={11}
-              color={isUrgent ? '#c53030' : '#718096'}
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[styles.timeText, isUrgent && styles.timeTextUrgent]}>
-              {daysLeft <= 0 ? 'Expired' : daysLeft === 1 ? 'Last day!' : `${daysLeft}d left`}
-            </Text>
+          <View style={styles.footerRight}>
+            {distance !== undefined && (
+              <View style={styles.distanceChip}>
+                <FontAwesome name="location-arrow" size={10} color="#3182ce" style={{ marginRight: 3 }} />
+                <Text style={styles.distanceText}>
+                  {distance < 0.1 ? '<0.1' : distance < 10 ? distance.toFixed(1) : Math.round(distance)} mi
+                </Text>
+              </View>
+            )}
+            <View style={[styles.timeChip, isUrgent && styles.timeChipUrgent]}>
+              <FontAwesome
+                name="clock-o"
+                size={11}
+                color={isUrgent ? '#c53030' : '#718096'}
+                style={{ marginRight: 3 }}
+              />
+              <Text style={[styles.timeText, isUrgent && styles.timeTextUrgent]}>
+                {daysLeft <= 0 ? 'Expired' : daysLeft === 1 ? 'Last day!' : `${daysLeft}d left`}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -87,7 +98,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  available: { bg: '#c6f6d5', text: '#276749' },
+  available: { bg: '#D1FAE5', text: '#047857' },
   claimed: { bg: '#fefcbf', text: '#744210' },
   picked_up: { bg: '#bee3f8', text: '#2a4365' },
   disposed: { bg: '#e2e8f0', text: '#4a5568' },
@@ -110,7 +121,7 @@ const styles = StyleSheet.create({
   photoArea: {
     height: 160,
     position: 'relative',
-    backgroundColor: '#111',
+    backgroundColor: '#f1f5f9',
   },
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: {
@@ -154,9 +165,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
   },
-  footerItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  footerItem: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
   footerText: { fontSize: 12, color: '#718096', flex: 1 },
+  footerRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  distanceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ebf8ff',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  distanceText: { fontSize: 11, color: '#3182ce', fontWeight: '600' },
   timeChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -168,5 +190,5 @@ const styles = StyleSheet.create({
   timeChipUrgent: { backgroundColor: '#fff5f5' },
   timeText: { fontSize: 12, color: '#718096', fontWeight: '600' },
   timeTextUrgent: { color: '#c53030' },
-  waitlistText: { fontSize: 12, color: '#2E8B57', marginTop: 6, fontWeight: '600' },
+  waitlistText: { fontSize: 12, color: '#10B981', marginTop: 6, fontWeight: '600' },
 });

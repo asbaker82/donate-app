@@ -1,14 +1,28 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Platform, Image } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/store/AppContext';
+import { useAuth } from '@/store/AuthContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
   const { currentUser, users, getMyItems, items, searchNotifications, updateSearchNotification, deleteSearchNotification } = useApp();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+
+  const handleLogout = () => {
+    const doLogout = () => logout();
+    if (Platform.OS === 'web') {
+      if (window.confirm('Sign out of Donate App?')) doLogout();
+    } else {
+      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: doLogout },
+      ]);
+    }
+  };
 
   const myItems = getMyItems();
   const claimedByMe = items.filter(
@@ -17,7 +31,7 @@ export default function ProfileScreen() {
   const friendList = users.filter(u => currentUser.friends.includes(u.id));
 
   const stats = [
-    { label: 'Listed', value: myItems.length, icon: 'gift' as const, color: '#2E8B57', filter: 'listed' as const },
+    { label: 'Listed', value: myItems.length, icon: 'gift' as const, color: '#10B981', filter: 'listed' as const },
     { label: 'Active', value: myItems.filter(i => i.status === 'available' || i.status === 'claimed').length, icon: 'check-circle' as const, color: '#3182ce', filter: 'active' as const },
     { label: 'Claimed by You', value: items.filter(i => i.claimedBy === currentUser.id).length, icon: 'hand-o-right' as const, color: '#d69e2e', filter: 'claimed' as const },
     { label: 'Friends', value: friendList.length, icon: 'users' as const, color: '#805ad5', filter: null },
@@ -26,13 +40,44 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.avatarSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {currentUser.name.split(' ').map(n => n[0]).join('')}
-          </Text>
-        </View>
+        <Pressable onPress={() => router.push('/edit-profile')} style={styles.avatarWrap}>
+          {currentUser.profilePhoto ? (
+            <Image source={{ uri: currentUser.profilePhoto }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {currentUser.name.split(' ').map(n => n[0]).join('')}
+              </Text>
+            </View>
+          )}
+          <View style={styles.editBadge}>
+            <FontAwesome name="pencil" size={11} color="#fff" />
+          </View>
+        </Pressable>
         <Text style={styles.name}>{currentUser.name}</Text>
-        <Text style={styles.email}>{currentUser.email}</Text>
+        {currentUser.phone ? (
+          <Text style={styles.email}>
+            {currentUser.phone.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '$1 ($2) $3-$4')}
+          </Text>
+        ) : currentUser.email ? (
+          <Text style={styles.email}>{currentUser.email}</Text>
+        ) : null}
+        {currentUser.defaultAddress ? (
+          <View style={styles.addressRow}>
+            <FontAwesome name="map-marker" size={12} color="#718096" style={{ marginRight: 5 }} />
+            <Text style={styles.addressText} numberOfLines={1}>{currentUser.defaultAddress}</Text>
+          </View>
+        ) : null}
+        <View style={styles.profileActions}>
+          <Pressable style={({ pressed }) => [styles.editProfileBtn, pressed && { opacity: 0.7 }]} onPress={() => router.push('/edit-profile')}>
+            <FontAwesome name="pencil" size={12} color="#10B981" style={{ marginRight: 6 }} />
+            <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]} onPress={handleLogout}>
+            <FontAwesome name="sign-out" size={12} color="#718096" style={{ marginRight: 6 }} />
+            <Text style={styles.logoutBtnText}>Sign Out</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.statsRow}>
@@ -59,9 +104,27 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Friends</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Friends</Text>
+          <Pressable
+            style={({ pressed }) => [styles.addFriendsBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push('/add-friends')}
+          >
+            <FontAwesome name="user-plus" size={12} color="#10B981" style={{ marginRight: 5 }} />
+            <Text style={styles.addFriendsBtnText}>Add</Text>
+          </Pressable>
+        </View>
         {friendList.length === 0 ? (
-          <Text style={styles.empty}>No friends yet</Text>
+          <View>
+            <Text style={[styles.empty, { marginBottom: 12 }]}>No friends yet.</Text>
+            <Pressable
+              style={({ pressed }) => [styles.addFriendsCTA, pressed && { opacity: 0.7 }]}
+              onPress={() => router.push('/add-friends')}
+            >
+              <FontAwesome name="user-plus" size={14} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.addFriendsCTAText}>Add Friends from Contacts</Text>
+            </Pressable>
+          </View>
         ) : (
           friendList.map(friend => (
             <View key={friend.id} style={styles.friendRow}>
@@ -72,7 +135,11 @@ export default function ProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.friendName}>{friend.name}</Text>
-                <Text style={styles.friendEmail}>{friend.email}</Text>
+                {friend.phone ? (
+                  <Text style={styles.friendEmail}>
+                    {friend.phone.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '($2) $3-$4')}
+                  </Text>
+                ) : null}
               </View>
               <View style={styles.friendItemCount}>
                 <Text style={styles.friendItemCountText}>
@@ -87,7 +154,7 @@ export default function ProfileScreen() {
       {/* Search Alerts */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <FontAwesome name="bell" size={15} color="#2E8B57" style={{ marginRight: 8 }} />
+          <FontAwesome name="bell" size={15} color="#10B981" style={{ marginRight: 8 }} />
           <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Search Alerts</Text>
         </View>
         {searchNotifications.length === 0 ? (
@@ -112,7 +179,7 @@ export default function ProfileScreen() {
                 />
               ) : (
                 <>
-                  <FontAwesome name="bell" size={13} color="#2E8B57" style={styles.alertIcon} />
+                  <FontAwesome name="bell" size={13} color="#10B981" style={styles.alertIcon} />
                   <Text style={styles.alertKeyword}>{notif.keyword}</Text>
                 </>
               )}
@@ -169,7 +236,7 @@ export default function ProfileScreen() {
         ].map(tip => (
           <View key={tip.title} style={styles.tipRow}>
             <View style={styles.tipIcon}>
-              <FontAwesome name={tip.icon} size={16} color="#2E8B57" />
+              <FontAwesome name={tip.icon} size={16} color="#10B981" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.tipTitle}>{tip.title}</Text>
@@ -185,19 +252,77 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fa' },
   content: { paddingBottom: 40 },
-  avatarSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 24, backgroundColor: '#fff' },
+  avatarSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 24, backgroundColor: '#fff', gap: 4 },
+  avatarWrap: { position: 'relative', marginBottom: 12 },
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#2E8B57',
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
   avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4a5568',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   name: { fontSize: 22, fontWeight: '700', color: '#2d3748' },
-  email: { fontSize: 14, color: '#718096', marginTop: 4 },
+  email: { fontSize: 14, color: '#718096' },
+  addressRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, maxWidth: 260 },
+  addressText: { fontSize: 13, color: '#718096', flex: 1 },
+  profileActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+  },
+  editProfileBtnText: { fontSize: 13, color: '#10B981', fontWeight: '600' },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  logoutBtnText: { fontSize: 13, color: '#718096', fontWeight: '600' },
+  addFriendsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+  },
+  addFriendsBtnText: { fontSize: 12, color: '#10B981', fontWeight: '600' },
+  addFriendsCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  addFriendsCTAText: { fontSize: 14, color: '#fff', fontWeight: '700' },
   statsRow: {
     flexDirection: 'row',
     margin: 16,
@@ -252,16 +377,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2d3748',
     borderWidth: 1.5,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
   },
   alertActions: { flexDirection: 'row', gap: 12 },
   alertIconBtn: { padding: 4 },
   alertSaveBtn: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: '#10B981',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -288,12 +413,12 @@ const styles = StyleSheet.create({
   friendName: { fontSize: 14, fontWeight: '600', color: '#2d3748' },
   friendEmail: { fontSize: 12, color: '#718096' },
   friendItemCount: {
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  friendItemCountText: { fontSize: 12, color: '#2E8B57', fontWeight: '600' },
+  friendItemCountText: { fontSize: 12, color: '#10B981', fontWeight: '600' },
   tipRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -304,7 +429,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
   },

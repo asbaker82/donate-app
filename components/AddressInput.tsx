@@ -110,7 +110,7 @@ export default function AddressInput({ value, onChangeText, placeholder, style, 
   return (
     <View style={[styles.wrapper, style]}>
       <View style={[styles.inputRow, open && styles.inputRowOpen, error && styles.inputRowError]}>
-        <FontAwesome name="map-marker" size={15} color="#2E8B57" style={styles.pin} />
+        <FontAwesome name="map-marker" size={15} color="#10B981" style={styles.pin} />
         <TextInput
           style={styles.input}
           value={value}
@@ -123,7 +123,7 @@ export default function AddressInput({ value, onChangeText, placeholder, style, 
           autoComplete="street-address"
         />
         {loading ? (
-          <ActivityIndicator size="small" color="#2E8B57" />
+          <ActivityIndicator size="small" color="#10B981" />
         ) : value.length > 0 ? (
           <Pressable onPress={() => { onChangeText(''); setSuggestions([]); setOpen(false); }}>
             <FontAwesome name="times-circle" size={16} color="#a0aec0" />
@@ -142,7 +142,7 @@ export default function AddressInput({ value, onChangeText, placeholder, style, 
                 style={[styles.row, i < suggestions.length - 1 && styles.rowBorder]}
                 onPress={() => handleSelect(result)}
               >
-                <FontAwesome name="map-marker" size={13} color="#2E8B57" style={styles.rowPin} />
+                <FontAwesome name="map-marker" size={13} color="#10B981" style={styles.rowPin} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowMain} numberOfLines={1}>{firstLine}</Text>
                   {rest.length > 0 && (
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   inputRowError: { borderColor: '#fc8181', backgroundColor: '#fff5f5' },
   inputRowOpen: {
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderTopWidth: 0,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
     shadowColor: '#000',

@@ -1,63 +1,92 @@
 # Donate App
 
-A mobile app for giving unneeded items to friends. Built with Expo Router and React Native.
+A React Native / Expo app for sharing household items with friends. Donors post items they no longer need with a disposal deadline; friends claim, waitlist, and arrange pickup before the item goes to charity.
 
-## What it does
+## Stack
 
-**As a donor** you photograph and list items you no longer need, set a pickup window and location, choose where unclaimed items go (Goodwill, Salvation Army, Habitat for Humanity, trash, etc.), and optionally restrict who can claim an item (e.g. "foster care placements only"). You can edit or remove listings at any time.
+- **Expo SDK 54** / React Native 0.81 (Expo Router v3, file-based routing)
+- **TypeScript** throughout
+- **React Context API** for all state — no Redux or Zustand
+- **AsyncStorage** for persistence (web = localStorage)
+- **Nominatim (OpenStreetMap)** for address autocomplete and distance calculation — no API key required
 
-**As a donee** you browse your friends' listings, claim items you want, and join a waitlist if something is already claimed. If the current claimant doesn't pick up within the donor's timeframe, the next person on the waitlist is automatically offered the item. Claiming triggers a confetti celebration; joining the waitlist shows a confirmation toast.
-
-## Features
-
-- Photo listings with up to 6 images, condition rating, and optional restrictions
-- Tap-to-expand image lightbox with swipe navigation, dot indicators, and thumbnail strip
-- Real-time address autocomplete (OpenStreetMap / Nominatim — no API key needed)
-- One-tap driving directions from item detail screen
-- Claim + waitlist queue with configurable pickup deadline
-- Automatic waitlist promotion when a claim expires
-- Disposal deadline countdown with urgency highlighting
-- Fuzzy search with typo tolerance across title, description, and restrictions
-- Search history dropdown with recent terms
-- Search alerts — save a keyword and get notified when a matching item is posted
-- Text Donor button — compose an SMS to the donor directly from the item detail screen
-- Celebratory animation + haptic feedback on claim
-- Slide-up toast + haptic feedback on joining waitlist
-- Donor can edit or delete their own listings
-- Profile stat tiles (Listed / Active / Claimed by You) link to filtered item lists
-- Search alert management in Profile — add, edit, and delete keyword alerts
-- Custom tab bar that renders correctly across all viewport sizes
-
-## Tech stack
-
-- [Expo](https://expo.dev) ~54 / React Native 0.81
-- [Expo Router](https://expo.github.io/router) v6 — file-based navigation
-- React Native Reanimated ~4.1 + core `Animated` API for animations
-- Expo Haptics for native tactile feedback
-- React 19 with Context API for state (no Redux / Zustand)
-- TypeScript
-- React Native Web for browser testing
-
-## Getting started
+## Running locally
 
 ```bash
 npm install
-npx expo start --web      # browser at http://localhost:8081
+
+# Web — opens at http://localhost:8081
+npx expo start --web
+
+# iOS / Android
+npx expo start --ios
 npx expo start --android
-npx expo start --ios      # macOS only
 ```
+
+## Demo login
+
+The app uses phone + OTP auth. For local development:
+
+| Phone | Name |
+|---|---|
+| (555) 000-0101 | Adam Baker |
+| (555) 000-0102 | Sarah Johnson |
+| (555) 000-0103 | Mike Chen |
+| (555) 000-0104 | Lisa Rodriguez |
+
+Any of these numbers skip OTP. For any other number, the OTP code is always **1234**.
+
+## Features
+
+**Browsing & discovery**
+- Fuzzy search with typo tolerance across title, description, and restrictions
+- Status filter chips (All / Available / Claimed) and distance filter (≤ 5 / 10 / 25 / 50 mi)
+- Distance chip on each listing card showing miles from your home address
+- Search alerts — save a keyword and be notified when a matching item is posted
+- Search history dropdown with recent terms
+
+**Listings**
+- Photo listings (up to 6 images) with condition rating, optional restrictions, pickup window, and disposal deadline
+- Configurable pickup window after claiming (donor sets hours; validated against disposal date)
+- Disposal deadline countdown with urgency highlighting
+- Real-time address autocomplete powered by OpenStreetMap
+
+**Claiming & waitlist**
+- Claim items directly; join a waitlist when already claimed
+- Automatic waitlist promotion when a claim deadline passes
+- One-tap driving directions and Text Donor (SMS) from item detail
+- Pickup deadline shown in a slide-up toast after claiming
+
+**My Items**
+- Three tabs: items you're **listing**, items you've **claimed**, items you're **waitlisted** for
+- Waitlisted tab shows your queue position
+- Donors can dispose or remove their own active listings
+
+**Profile & social**
+- Add friends from device contacts or by browsing other app users
+- Control who sees your listings: people you've added, or anyone who's added you
+- Edit name, email, profile photo (with crop), and default pickup address
+- Profile reached via avatar icon in the top-right header
 
 ## Project structure
 
 ```
-store/            State layer — Context, types, mock data
-app/(tabs)/       Three tabs: Browse · My Items · Profile
-app/item/         Detail ([id].tsx), new listing (new.tsx), edit listing (edit/[id].tsx)
-app/items-list    Filtered item list (linked from profile stat tiles)
-components/       ItemCard, AddressInput, DatePickerInput, ImageLightbox,
-                  CustomTabBar, ClaimCelebration, WaitlistToast
+app/
+  (auth)/          Phone → OTP → name → contacts onboarding flow
+  (tabs)/          Browse, My Items, Profile (profile via header icon)
+  item/            Detail, new listing, edit listing
+  add-friends.tsx
+  edit-profile.tsx
+components/        ItemCard, DatePickerInput, AddressInput, ImageLightbox,
+                   CustomTabBar, ProfileHeaderButton, ClaimToast, WaitlistToast,
+                   ConfirmSheet, ClaimCelebration
+store/
+  AuthContext.tsx  Auth state + AsyncStorage persistence
+  AppContext.tsx   All app state and mutations
+  types.ts         Canonical TypeScript types
+  mockData.ts      Seed users and items
+utils/
+  geocode.ts       Nominatim geocoding + Haversine distance
 ```
 
-## Current state
-
-State is in-memory only — all data resets on refresh. The logged-in user is hardcoded as Adam Baker with three friends pre-populated as demo data. Backend, auth, and persistence are not yet implemented.
+See [CLAUDE.md](CLAUDE.md) for architecture details.

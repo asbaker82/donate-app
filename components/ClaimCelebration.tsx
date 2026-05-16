@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
-const COLORS = ['#2E8B57', '#48BB78', '#F6E05E', '#FC8181', '#63B3ED', '#B794F4', '#F6AD55', '#FBD38D'];
+const COLORS = ['#10B981', '#48BB78', '#F6E05E', '#FC8181', '#63B3ED', '#B794F4', '#F6AD55', '#FBD38D'];
 const PARTICLE_COUNT = 20;
 
 // Pre-compute static particle properties so interpolations are stable across renders
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#2E8B57',
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

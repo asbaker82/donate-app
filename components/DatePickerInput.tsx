@@ -139,6 +139,7 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
         {cells.map((cell, i) => {
           const isSelected = cell.iso === value;
           const isToday    = cell.iso === today;
+          const isPast     = cell.iso < today;
           return (
             <Pressable
               key={i}
@@ -146,14 +147,17 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
                 styles.cell,
                 isSelected && styles.cellSelected,
                 isToday && !isSelected && styles.cellToday,
+                isPast && styles.cellPast,
               ]}
-              onPress={() => pickDay(cell.iso)}
+              onPress={() => !isPast && pickDay(cell.iso)}
+              disabled={isPast}
             >
               <Text style={[
                 styles.cellText,
                 !cell.cur && styles.cellFaded,
                 isSelected && styles.cellTextSelected,
                 isToday && !isSelected && styles.cellTextToday,
+                isPast && styles.cellTextPast,
               ]}>
                 {cell.day}
               </Text>
@@ -174,7 +178,7 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
     <View style={styles.wrapper}>
       {/* Input row */}
       <View style={[styles.inputRow, open && styles.inputRowOpen]}>
-        <FontAwesome name="calendar" size={15} color="#2E8B57" style={styles.calIcon} />
+        <FontAwesome name="calendar" size={15} color="#10B981" style={styles.calIcon} />
         <TextInput
           style={styles.input}
           value={text}
@@ -215,6 +219,7 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
 }
 
 const CELL_SIZE = 36;
+const CALENDAR_WIDTH = CELL_SIZE * 7 + 24; // 276 — fixed so it never stretches
 
 const styles = StyleSheet.create({
   wrapper: { position: 'relative', zIndex: 20 },
@@ -229,7 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
     gap: 8,
   },
-  inputRowOpen: { borderColor: '#2E8B57' },
+  inputRowOpen: { borderColor: '#10B981' },
   calIcon: { width: 18 },
   input: { flex: 1, fontSize: 15, color: '#2d3748' },
   toggleBtn: { padding: 4 },
@@ -247,7 +252,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '100%',
     left: 0,
-    right: 0,
+    width: CALENDAR_WIDTH,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1.5,
@@ -305,12 +310,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: CELL_SIZE / 2,
   },
-  cellSelected: { backgroundColor: '#2E8B57' },
-  cellToday: { backgroundColor: '#f0fff4', borderWidth: 1.5, borderColor: '#2E8B57' },
+  cellSelected: { backgroundColor: '#10B981' },
+  cellToday: { backgroundColor: '#ECFDF5', borderWidth: 1.5, borderColor: '#10B981' },
   cellText: { fontSize: 13, color: '#2d3748', fontWeight: '500' },
   cellFaded: { color: '#cbd5e0' },
   cellTextSelected: { color: '#fff', fontWeight: '700' },
-  cellTextToday: { color: '#2E8B57', fontWeight: '700' },
+  cellTextToday: { color: '#10B981', fontWeight: '700' },
+  cellPast: { opacity: 0.3 },
+  cellTextPast: { color: '#a0aec0' },
 
   todayBtn: {
     marginTop: 10,
@@ -318,9 +325,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
   },
-  todayBtnText: { fontSize: 13, color: '#2E8B57', fontWeight: '700' },
+  todayBtnText: { fontSize: 13, color: '#10B981', fontWeight: '700' },
 });

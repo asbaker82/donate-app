@@ -53,7 +53,7 @@ function FieldError({ message }: { message?: string }) {
 
 export default function NewItemScreen() {
   const router = useRouter();
-  const { createItem } = useApp();
+  const { createItem, currentUser } = useApp();
   const scrollRef = useRef<ScrollView>(null);
   const fieldOffsets = useRef<Partial<Record<FieldKey, number>>>({});
 
@@ -62,7 +62,7 @@ export default function NewItemScreen() {
   const [description, setDescription] = useState('');
   const [condition, setCondition] = useState<ItemCondition>('good');
   const [restrictions, setRestrictions] = useState('');
-  const [pickupLocation, setPickupLocation] = useState('');
+  const [pickupLocation, setPickupLocation] = useState(currentUser.defaultAddress ?? '');
   const [pickupWindow, setPickupWindow] = useState('');
   const [disposalDate, setDisposalDate] = useState('');
   const [disposalMethod, setDisposalMethod] = useState<DisposalMethod>('goodwill');
@@ -103,6 +103,14 @@ export default function NewItemScreen() {
     const hours = parseInt(claimPickupHours, 10);
     if (isNaN(hours) || hours < 1)
       next.claimPickupHours = 'Please enter a pickup window of at least 1 hour.';
+
+    // Claim window must fit before the disposal deadline
+    if (!next.disposalDate && !next.claimPickupHours && disposalDate && !isNaN(hours)) {
+      const hoursUntilDisposal = (new Date(disposalDate).getTime() - Date.now()) / 3_600_000;
+      if (hours >= hoursUntilDisposal) {
+        next.claimPickupHours = `The pickup window (${hours}h) must be shorter than the time until disposal (~${Math.floor(hoursUntilDisposal)}h away). Shorten the pickup window or choose a later disposal date.`;
+      }
+    }
 
     if (Object.keys(next).length > 0) {
       setErrors(next);
@@ -157,7 +165,7 @@ export default function NewItemScreen() {
           ))}
           {photos.length < 6 && (
             <Pressable style={styles.addPhotoBtn} onPress={addPhoto}>
-              <FontAwesome name="camera" size={24} color="#2E8B57" />
+              <FontAwesome name="camera" size={24} color="#10B981" />
               <Text style={styles.addPhotoText}>
                 {Platform.OS === 'web' ? 'Upload' : 'Add Photo'}
               </Text>
@@ -383,13 +391,13 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  addPhotoText: { fontSize: 12, color: '#2E8B57', fontWeight: '600' },
+  addPhotoText: { fontSize: 12, color: '#10B981', fontWeight: '600' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   chip: {
@@ -400,14 +408,14 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     backgroundColor: '#f7fafc',
   },
-  chipActive: { backgroundColor: '#2E8B57', borderColor: '#2E8B57' },
+  chipActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
   chipText: { fontSize: 13, color: '#4a5568', fontWeight: '600' },
   chipTextActive: { color: '#fff' },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2E8B57',
+    backgroundColor: '#10B981',
     margin: 16,
     borderRadius: 14,
     paddingVertical: 16,

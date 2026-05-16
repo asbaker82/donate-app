@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useApp } from '@/store/AppContext';
 import ItemCard from '@/components/ItemCard';
 import { Item } from '@/store/types';
+import { geocodeAddress, haversineMiles } from '@/utils/geocode';
 
 type Filter = 'all' | 'available' | 'claimed';
 
@@ -90,10 +91,39 @@ export default function BrowseScreen() {
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [maxMiles, setMaxMiles] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [itemDistances, setItemDistances] = useState<Record<string, number>>({});
+
   const friendItems = getFriendItems();
+
+  // Geocode user's home address once
+  useEffect(() => {
+    if (!currentUser.defaultAddress) return;
+    geocodeAddress(currentUser.defaultAddress).then(c => { if (c) setUserCoords(c); });
+  }, [currentUser.defaultAddress]);
+
+  // Geocode each visible item's pickup address (lazy, cached in module)
+  useEffect(() => {
+    if (!userCoords) return;
+    let cancelled = false;
+    (async () => {
+      for (const item of friendItems) {
+        if (cancelled) break;
+        if (item.id in itemDistances) continue;
+        const coords = await geocodeAddress(item.pickupLocation);
+        if (coords && !cancelled) {
+          setItemDistances(prev => ({ ...prev, [item.id]: haversineMiles(userCoords, coords) }));
+        }
+        // Nominatim rate limit: 1 req/sec
+        await new Promise(r => setTimeout(r, 1100));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userCoords, friendItems.length]);
 
   const myTurn = items.filter(
     item =>
@@ -107,6 +137,11 @@ export default function BrowseScreen() {
     .map(item => ({ item, score: fuzzyScore(search, item) }))
     .filter(({ score }) => score > 0)
     .filter(({ item }) => filter === 'all' || item.status === filter)
+    .filter(({ item }) => {
+      if (!maxMiles || !userCoords) return true;
+      const dist = itemDistances[item.id];
+      return dist === undefined || dist <= maxMiles; // show while geocoding
+    })
     .sort((a, b) =>
       b.score !== a.score
         ? b.score - a.score
@@ -219,7 +254,7 @@ export default function BrowseScreen() {
             <FontAwesome
               name="bell"
               size={15}
-              color={searchNotifications.some(n => n.keyword.toLowerCase() === search.trim().toLowerCase()) ? '#fff' : '#2E8B57'}
+              color={searchNotifications.some(n => n.keyword.toLowerCase() === search.trim().toLowerCase()) ? '#fff' : '#10B981'}
             />
           </Pressable>
         )}
@@ -266,22 +301,54 @@ export default function BrowseScreen() {
         )}
       </View>
 
+      {/* Distance filter chips — only shown when user has a default address */}
+      {currentUser.defaultAddress ? (
+        <View style={styles.filterRow}>
+          <FontAwesome name="location-arrow" size={12} color="#3182ce" style={{ marginRight: 2 }} />
+          {([null, 5, 10, 25, 50] as (number | null)[]).map(miles => (
+            <Pressable
+              key={miles ?? 'any'}
+              style={[styles.filterBtn, styles.distanceBtn, maxMiles === miles && styles.distanceBtnActive]}
+              onPress={() => setMaxMiles(miles)}
+            >
+              <Text style={[styles.filterBtnText, styles.distanceBtnText, maxMiles === miles && styles.distanceBtnTextActive]}>
+                {miles === null ? 'Any dist.' : `≤ ${miles} mi`}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {sortedFiltered.length === 0 ? (
         <View style={styles.empty}>
-          <FontAwesome name="inbox" size={52} color="#cbd5e0" />
+          <FontAwesome
+            name={!search.trim() && currentUser.friends.length === 0 ? 'users' : 'inbox'}
+            size={52}
+            color="#cbd5e0"
+          />
           <Text style={styles.emptyTitle}>
-            {search.trim() ? 'No matches found' : 'No items found'}
+            {search.trim()
+              ? 'No matches found'
+              : currentUser.friends.length === 0
+                ? 'No friends added yet'
+                : 'No items found'}
           </Text>
           <Text style={styles.emptySubtitle}>
             {search.trim()
               ? 'Try different words, or set an alert to be notified when one is posted.'
-              : friendItems.length === 0
-                ? 'Items from your friends will appear here'
+              : currentUser.friends.length === 0
+                ? 'Add friends to see what they\'re giving away.'
                 : 'Try adjusting your filter'}
           </Text>
+          {!search.trim() && currentUser.friends.length === 0 && (
+            <Pressable style={styles.emptyAddFriendsBtn} onPress={() => router.push('/add-friends')}>
+              <FontAwesome name="user-plus" size={14} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.emptyAddFriendsBtnText}>Add Friends from Contacts</Text>
+            </Pressable>
+          )}
           {search.trim().length > 0 && (
             <Pressable style={styles.emptyAlertBtn} onPress={handleSetAlert}>
-              <FontAwesome name="bell" size={14} color="#2E8B57" style={{ marginRight: 6 }} />
+              <FontAwesome name="bell" size={14} color="#10B981" style={{ marginRight: 6 }} />
               <Text style={styles.emptyAlertBtnText}>Set Alert for "{search.trim()}"</Text>
             </Pressable>
           )}
@@ -291,7 +358,7 @@ export default function BrowseScreen() {
           data={sortedFiltered}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <ItemCard item={item} onPress={() => { addToSearchHistory(search.trim()); router.push(`/item/${item.id}`); }} />
+            <ItemCard item={item} onPress={() => { addToSearchHistory(search.trim()); router.push(`/item/${item.id}`); }} distance={itemDistances[item.id]} />
           )}
           contentContainerStyle={{ paddingBottom: 24, paddingTop: 8 }}
           showsVerticalScrollIndicator={false}
@@ -304,7 +371,7 @@ export default function BrowseScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fa' },
   banner: {
-    backgroundColor: '#276749',
+    backgroundColor: '#059669',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -335,20 +402,20 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  searchBoxOpen: { borderColor: '#2E8B57', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  searchBoxOpen: { borderColor: '#10B981', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   searchInput: { flex: 1, fontSize: 15, color: '#2d3748' },
   searchAction: { padding: 2 },
   alertBtn: {
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1.5,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  alertBtnActive: { backgroundColor: '#2E8B57' },
+  alertBtnActive: { backgroundColor: '#10B981' },
 
   // History dropdown
   historyDropdown: {
@@ -356,7 +423,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderTopWidth: 0,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
     shadowColor: '#000',
@@ -401,10 +468,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#e2e8f0',
   },
-  filterBtnActive: { backgroundColor: '#2E8B57' },
+  filterBtnActive: { backgroundColor: '#10B981' },
   filterBtnText: { fontSize: 13, color: '#4a5568', fontWeight: '600' },
   filterBtnTextActive: { color: '#fff' },
   matchCount: { fontSize: 12, color: '#a0aec0', marginLeft: 'auto' },
+  distanceBtn: { backgroundColor: '#ebf8ff', borderWidth: 1, borderColor: '#bee3f8' },
+  distanceBtnActive: { backgroundColor: '#3182ce', borderColor: '#3182ce' },
+  distanceBtnText: { color: '#3182ce' },
+  distanceBtnTextActive: { color: '#fff' },
 
   empty: {
     flex: 1,
@@ -416,16 +487,26 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#a0aec0', marginTop: 16 },
   emptySubtitle: { fontSize: 14, color: '#cbd5e0', textAlign: 'center' },
+  emptyAddFriendsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    backgroundColor: '#10B981',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  emptyAddFriendsBtnText: { fontSize: 14, color: '#fff', fontWeight: '700' },
   emptyAlertBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  emptyAlertBtnText: { fontSize: 13, color: '#2E8B57', fontWeight: '600' },
+  emptyAlertBtnText: { fontSize: 13, color: '#10B981', fontWeight: '600' },
 });

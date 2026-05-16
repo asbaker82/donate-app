@@ -37,12 +37,20 @@ export interface SearchNotification {
   createdAt: string;
 }
 
+export type ItemVisibility = 'added' | 'both';
+
 export interface User {
   id: string;
   name: string;
   email: string;
   phone?: string;
   friends: string[];
+  profilePhoto?: string;
+  defaultAddress?: string;
+  /** Who can see this user's listings.
+   *  'added' (default) = only people this user has added as friends.
+   *  'both' = people this user added OR anyone who has added this user. */
+  itemVisibility?: ItemVisibility;
 }
 
 export const DISPOSAL_METHOD_LABELS: Record<DisposalMethod, string> = {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -52,8 +52,10 @@ import {
   CONDITION_COLORS,
 } from '@/store/types';
 import ImageLightbox from '@/components/ImageLightbox';
-import ClaimCelebration from '@/components/ClaimCelebration';
+import { geocodeAddress, haversineMiles } from '@/utils/geocode';
+import ClaimToast from '@/components/ClaimToast';
 import WaitlistToast from '@/components/WaitlistToast';
+import ConfirmSheet from '@/components/ConfirmSheet';
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,10 +75,13 @@ export default function ItemDetailScreen() {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [showCelebration, setShowCelebration] = useState(false);
+  const [showClaimToast, setShowClaimToast] = useState(false);
+  const [claimDeadlineDate, setClaimDeadlineDate] = useState<Date | null>(null);
   const [showWaitlistToast, setShowWaitlistToast] = useState(false);
+  const [showReleaseSheet, setShowReleaseSheet] = useState(false);
   const [smsVisible, setSmsVisible] = useState(false);
   const [smsMessage, setSmsMessage] = useState('');
+  const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
 
   const item = items.find(i => i.id === id);
   if (!item) {
@@ -86,6 +91,21 @@ export default function ItemDetailScreen() {
       </View>
     );
   }
+
+  useEffect(() => {
+    if (!currentUser.defaultAddress || !item) return;
+    let cancelled = false;
+    (async () => {
+      const [userCoords, itemCoords] = await Promise.all([
+        geocodeAddress(currentUser.defaultAddress!),
+        geocodeAddress(item.pickupLocation),
+      ]);
+      if (!cancelled && userCoords && itemCoords) {
+        setDistanceMiles(haversineMiles(userCoords, itemCoords));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser.defaultAddress, item?.pickupLocation]);
 
   const donor = getUserById(item.donorId);
   const claimedByUser = item.claimedBy ? getUserById(item.claimedBy) : null;
@@ -102,48 +122,18 @@ export default function ItemDetailScreen() {
     ? Math.max(0, Math.ceil((claimDeadline.getTime() - Date.now()) / 3600000))
     : null;
 
-  const doClaim = () => {
+  const handleClaim = () => {
+    const deadline = new Date(Date.now() + item.claimPickupHours * 3600000);
     claimItem(item.id);
     playClaimSound();
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    setShowCelebration(true);
+    setClaimDeadlineDate(deadline);
+    setShowClaimToast(true);
   };
 
-  const handleClaim = () => {
-    if (Platform.OS === 'web') {
-      if (confirm(`Claim "${item.title}"? You'll have ${item.claimPickupHours} hours to arrange pickup.`)) {
-        doClaim();
-      }
-      return;
-    }
-    Alert.alert(
-      'Claim Item',
-      `Claim "${item.title}"? You'll have ${item.claimPickupHours} hours to arrange pickup.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Claim', onPress: doClaim },
-      ]
-    );
-  };
-
-  const handleRelease = () => {
-    if (Platform.OS === 'web') {
-      if (confirm('Release your claim? The next person on the waitlist will be notified.')) {
-        releaseClaim(item.id);
-      }
-      return;
-    }
-    Alert.alert(
-      'Release Claim',
-      'Release your claim? The next person on the waitlist will be notified.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Release', style: 'destructive', onPress: () => releaseClaim(item.id) },
-      ]
-    );
-  };
+  const handleRelease = () => setShowReleaseSheet(true);
 
   const handlePickedUp = () => {
     if (Platform.OS === 'web') {
@@ -254,22 +244,33 @@ export default function ItemDetailScreen() {
       <View style={styles.infoCard}>
         <Text style={styles.infoCardTitle}>Pickup Details</Text>
         <Pressable style={styles.infoRow} onPress={() => openDirections(item.pickupLocation)}>
-          <FontAwesome name="map-marker" size={14} color="#2E8B57" style={styles.infoIcon} />
+          <FontAwesome name="map-marker" size={14} color="#10B981" style={styles.infoIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Location — tap for directions</Text>
             <Text style={[styles.infoValue, styles.directionsLink]}>{item.pickupLocation}</Text>
           </View>
-          <FontAwesome name="location-arrow" size={14} color="#2E8B57" />
+          <FontAwesome name="location-arrow" size={14} color="#10B981" />
         </Pressable>
+        {distanceMiles !== null && (
+          <View style={styles.infoRow}>
+            <FontAwesome name="car" size={14} color="#3182ce" style={styles.infoIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoLabel}>Distance from you</Text>
+              <Text style={[styles.infoValue, styles.distanceValue]}>
+                {distanceMiles < 0.1 ? 'Less than 0.1 mi' : distanceMiles < 10 ? `${distanceMiles.toFixed(1)} miles` : `${Math.round(distanceMiles)} miles`}
+              </Text>
+            </View>
+          </View>
+        )}
         <View style={styles.infoRow}>
-          <FontAwesome name="calendar" size={14} color="#2E8B57" style={styles.infoIcon} />
+          <FontAwesome name="calendar" size={14} color="#10B981" style={styles.infoIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Availability</Text>
             <Text style={styles.infoValue}>{item.pickupWindow}</Text>
           </View>
         </View>
         <View style={styles.infoRow}>
-          <FontAwesome name="clock-o" size={14} color="#2E8B57" style={styles.infoIcon} />
+          <FontAwesome name="clock-o" size={14} color="#10B981" style={styles.infoIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Pickup window after claiming</Text>
             <Text style={styles.infoValue}>{item.claimPickupHours} hours</Text>
@@ -357,7 +358,7 @@ export default function ItemDetailScreen() {
               setShowWaitlistToast(true);
             }}
           >
-            <FontAwesome name="list" size={15} color="#2E8B57" style={{ marginRight: 8 }} />
+            <FontAwesome name="list" size={15} color="#10B981" style={{ marginRight: 8 }} />
             <Text style={styles.secondaryBtnText}>Join Waitlist</Text>
           </Pressable>
         )}
@@ -385,7 +386,7 @@ export default function ItemDetailScreen() {
         {isMyItem && (
           <View style={styles.btnGroup}>
             <Pressable style={styles.editBtn} onPress={() => router.push(`/item/edit/${item.id}`)}>
-              <FontAwesome name="pencil" size={14} color="#2E8B57" style={{ marginRight: 8 }} />
+              <FontAwesome name="pencil" size={14} color="#10B981" style={{ marginRight: 8 }} />
               <Text style={styles.editBtnText}>Edit Listing</Text>
             </Pressable>
             <Pressable style={styles.dangerBtn} onPress={handleDeleteItem}>
@@ -411,16 +412,33 @@ export default function ItemDetailScreen() {
       </View>
     </ScrollView>
 
-      {/* Claim celebration overlay */}
-      <ClaimCelebration
-        visible={showCelebration}
-        onComplete={() => setShowCelebration(false)}
+      {/* Claim toast */}
+      <ClaimToast
+        visible={showClaimToast}
+        deadlineDate={claimDeadlineDate}
+        onComplete={() => setShowClaimToast(false)}
       />
 
       {/* Waitlist toast */}
       <WaitlistToast
         visible={showWaitlistToast}
         onComplete={() => setShowWaitlistToast(false)}
+      />
+
+      {/* Release claim confirmation sheet */}
+      <ConfirmSheet
+        visible={showReleaseSheet}
+        title="Release Your Claim?"
+        message={
+          item.waitlist.length > 0
+            ? `The next person on the waitlist will be offered the item.`
+            : `The item will go back to available for anyone to claim.`
+        }
+        confirmLabel="Release Claim"
+        cancelLabel="Keep Claim"
+        destructive
+        onConfirm={() => { setShowReleaseSheet(false); releaseClaim(item.id); }}
+        onCancel={() => setShowReleaseSheet(false)}
       />
 
       {/* Photo lightbox */}
@@ -456,7 +474,7 @@ export default function ItemDetailScreen() {
 
               <Text style={styles.modalLabel}>About</Text>
               <View style={styles.modalItemChip}>
-                <FontAwesome name="tag" size={12} color="#2E8B57" style={{ marginRight: 6 }} />
+                <FontAwesome name="tag" size={12} color="#10B981" style={{ marginRight: 6 }} />
                 <Text style={styles.modalItemChipText} numberOfLines={1}>{item.title}</Text>
               </View>
 
@@ -500,7 +518,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, object> = {
-  available: { backgroundColor: '#c6f6d5' },
+  available: { backgroundColor: '#D1FAE5' },
   claimed: { backgroundColor: '#fefcbf' },
   picked_up: { backgroundColor: '#bee3f8' },
   disposed: { backgroundColor: '#e2e8f0' },
@@ -522,7 +540,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  thumbActive: { borderColor: '#2E8B57' },
+  thumbActive: { borderColor: '#10B981' },
   photoPlaceholder: {
     height: 200,
     backgroundColor: '#f7fafc',
@@ -575,7 +593,8 @@ const styles = StyleSheet.create({
   infoIcon: { width: 22, marginTop: 1 },
   infoLabel: { fontSize: 11, color: '#a0aec0', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
   infoValue: { fontSize: 14, color: '#2d3748' },
-  directionsLink: { color: '#2E8B57', textDecorationLine: 'underline' },
+  directionsLink: { color: '#10B981', textDecorationLine: 'underline' },
+  distanceValue: { color: '#3182ce', fontWeight: '600' },
   waitlistRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -592,7 +611,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2E8B57',
+    backgroundColor: '#10B981',
     borderRadius: 12,
     paddingVertical: 14,
   },
@@ -601,13 +620,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     paddingVertical: 13,
   },
-  secondaryBtnText: { fontSize: 16, fontWeight: '700', color: '#2E8B57' },
+  secondaryBtnText: { fontSize: 16, fontWeight: '700', color: '#10B981' },
   ghostBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -621,13 +640,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#2E8B57',
+    borderColor: '#10B981',
     paddingVertical: 13,
   },
-  editBtnText: { fontSize: 15, fontWeight: '700', color: '#2E8B57' },
+  editBtnText: { fontSize: 15, fontWeight: '700', color: '#10B981' },
   dangerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -682,14 +701,14 @@ const styles = StyleSheet.create({
   modalItemChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0fff4',
+    backgroundColor: '#ECFDF5',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     marginBottom: 16,
     alignSelf: 'flex-start',
   },
-  modalItemChipText: { fontSize: 13, color: '#2E8B57', fontWeight: '600' },
+  modalItemChipText: { fontSize: 13, color: '#10B981', fontWeight: '600' },
   modalInput: {
     borderWidth: 1.5,
     borderColor: '#e2e8f0',

@@ -6,7 +6,6 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 const TABS: { name: string; label: string; icon: React.ComponentProps<typeof FontAwesome>['name'] }[] = [
   { name: 'index',    label: 'Browse',   icon: 'search' },
   { name: 'my-items', label: 'My Items', icon: 'gift'   },
-  { name: 'profile',  label: 'Profile',  icon: 'user'   },
 ];
 
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
@@ -16,7 +15,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
         const route = state.routes.find(r => r.name === tab.name);
         if (!route) return null;
         const focused = state.index === state.routes.indexOf(route);
-        const color = focused ? '#2E8B57' : '#a0aec0';
+        const color = focused ? '#10B981' : '#a0aec0';
 
         return (
           <Pressable

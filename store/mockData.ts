@@ -14,6 +14,7 @@ export const MOCK_USERS: User[] = [
     email: 'sarah.j@example.com',
     phone: '+15555550102',
     friends: ['user-1', 'user-3'],
+    itemVisibility: 'both',
   },
   {
     id: 'user-3',
@@ -21,6 +22,7 @@ export const MOCK_USERS: User[] = [
     email: 'mike.c@example.com',
     phone: '+15555550103',
     friends: ['user-1', 'user-2'],
+    itemVisibility: 'both',
   },
   {
     id: 'user-4',
@@ -28,6 +30,7 @@ export const MOCK_USERS: User[] = [
     email: 'lisa.r@example.com',
     phone: '+15555550104',
     friends: ['user-1'],
+    itemVisibility: 'both',
   },
 ];
 

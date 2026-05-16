@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Item, User, SearchNotification } from './types';
 import { MOCK_USERS, MOCK_ITEMS } from './mockData';
+import { useAuth } from './AuthContext';
 
 interface AppContextType {
   currentUser: User;
@@ -32,11 +33,15 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser] = useState<User>(MOCK_USERS[0]);
+  const { authUser } = useAuth();
   const [users] = useState<User[]>(MOCK_USERS);
   const [items, setItems] = useState<Item[]>(MOCK_ITEMS);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [searchNotifications, setSearchNotifications] = useState<SearchNotification[]>([]);
+
+  // Stub used only during the one-frame gap before the routing guard redirects
+  // unauthenticated users to the auth screens. Never actually surfaced to UI.
+  const currentUser: User = authUser ?? { id: '', name: '', email: '', phone: '', friends: [] };
 
   const processExpiredClaims = useCallback(() => {
     setItems(prev =>
@@ -71,16 +76,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [processExpiredClaims]);
 
-  const getUserById = (id: string) => users.find(u => u.id === id);
+  const getUserById = (id: string) => {
+    // Check mock users and any non-mock user that might be in the system
+    return users.find(u => u.id === id) ?? (currentUser.id === id ? currentUser : undefined);
+  };
 
   const getFriendItems = () => {
-    const friendIds = new Set(currentUser.friends);
-    return items.filter(
-      item =>
-        friendIds.has(item.donorId) &&
-        item.status !== 'picked_up' &&
-        item.status !== 'disposed'
-    );
+    const myFriendIds = new Set(currentUser.friends);
+    return items.filter(item => {
+      if (item.status === 'picked_up' || item.status === 'disposed') return false;
+      // Current user must have added this donor as a friend to browse their items
+      if (!myFriendIds.has(item.donorId)) return false;
+      // Respect the donor's visibility setting
+      const donor = users.find(u => u.id === item.donorId)
+        ?? (currentUser.id === item.donorId ? currentUser : null);
+      if (!donor) return false; // unknown donor — skip
+      const visibility = donor.itemVisibility ?? 'added';
+      if (visibility === 'both') return true; // donor shows to anyone who added them
+      // 'added': donor only shows to people they personally added
+      return (donor.friends ?? []).includes(currentUser.id);
+    });
   };
 
   const getMyItems = () => items.filter(item => item.donorId === currentUser.id);
