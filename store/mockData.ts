@@ -5,24 +5,28 @@ export const MOCK_USERS: User[] = [
     id: 'user-1',
     name: 'Adam Baker',
     email: 'adam.seth.baker@gmail.com',
+    phone: '+15555550101',
     friends: ['user-2', 'user-3', 'user-4'],
   },
   {
     id: 'user-2',
     name: 'Sarah Johnson',
     email: 'sarah.j@example.com',
+    phone: '+15555550102',
     friends: ['user-1', 'user-3'],
   },
   {
     id: 'user-3',
     name: 'Mike Chen',
     email: 'mike.c@example.com',
+    phone: '+15555550103',
     friends: ['user-1', 'user-2'],
   },
   {
     id: 'user-4',
     name: 'Lisa Rodriguez',
     email: 'lisa.r@example.com',
+    phone: '+15555550104',
     friends: ['user-1'],
   },
 ];

@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useApp } from '@/store/AppContext';
 import { ItemCondition, DisposalMethod, DISPOSAL_METHOD_LABELS, CONDITION_LABELS } from '@/store/types';
@@ -51,23 +51,39 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-export default function NewItemScreen() {
+export default function EditItemScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { createItem } = useApp();
+  const { items, updateItem } = useApp();
   const scrollRef = useRef<ScrollView>(null);
   const fieldOffsets = useRef<Partial<Record<FieldKey, number>>>({});
 
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [condition, setCondition] = useState<ItemCondition>('good');
-  const [restrictions, setRestrictions] = useState('');
-  const [pickupLocation, setPickupLocation] = useState('');
-  const [pickupWindow, setPickupWindow] = useState('');
-  const [disposalDate, setDisposalDate] = useState('');
-  const [disposalMethod, setDisposalMethod] = useState<DisposalMethod>('goodwill');
-  const [disposalMethodNote, setDisposalMethodNote] = useState('');
-  const [claimPickupHours, setClaimPickupHours] = useState('72');
+  const item = items.find(i => i.id === id);
+
+  if (!item) {
+    return (
+      <View style={styles.notFound}>
+        <Text style={styles.notFoundText}>Item not found.</Text>
+      </View>
+    );
+  }
+
+  // Parse ISO disposal date to YYYY-MM-DD for the picker
+  const initialDisposalDate = item.disposalDate
+    ? item.disposalDate.slice(0, 10)
+    : '';
+
+  const [photos, setPhotos] = useState<string[]>(item.photos);
+  const [title, setTitle] = useState(item.title);
+  const [description, setDescription] = useState(item.description);
+  const [condition, setCondition] = useState<ItemCondition>(item.condition);
+  const [restrictions, setRestrictions] = useState(item.restrictions ?? '');
+  const [pickupLocation, setPickupLocation] = useState(item.pickupLocation);
+  const [pickupWindow, setPickupWindow] = useState(item.pickupWindow);
+  const [disposalDate, setDisposalDate] = useState(initialDisposalDate);
+  const [disposalMethod, setDisposalMethod] = useState<DisposalMethod>(item.disposalMethod);
+  const [disposalMethodNote, setDisposalMethodNote] = useState(item.disposalMethodNote ?? '');
+  const [claimPickupHours, setClaimPickupHours] = useState(String(item.claimPickupHours));
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -106,7 +122,6 @@ export default function NewItemScreen() {
 
     if (Object.keys(next).length > 0) {
       setErrors(next);
-      // Scroll to the first error field
       const order: FieldKey[] = ['title', 'pickupLocation', 'pickupWindow', 'disposalDate', 'claimPickupHours'];
       const firstField = order.find(f => next[f]);
       if (firstField && fieldOffsets.current[firstField] !== undefined) {
@@ -116,7 +131,7 @@ export default function NewItemScreen() {
     }
 
     setSubmitting(true);
-    createItem({
+    updateItem(item.id, {
       title: title.trim(),
       description: description.trim(),
       photos,
@@ -149,7 +164,7 @@ export default function NewItemScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
           {photos.map((uri, i) => (
             <View key={i} style={styles.photoThumb}>
-              <Image source={{ uri }} style={styles.photoImg} />
+              <Image source={{ uri }} style={styles.photoImg} resizeMode="cover" />
               <Pressable style={styles.removePhoto} onPress={() => removePhoto(i)}>
                 <FontAwesome name="times-circle" size={18} color="#e53e3e" />
               </Pressable>
@@ -316,14 +331,14 @@ export default function NewItemScreen() {
         <FieldError message={errors.claimPickupHours} />
       </View>
 
-      {/* Submit */}
+      {/* Save */}
       <Pressable
         style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
         onPress={handleSubmit}
         disabled={submitting}
       >
         <FontAwesome name="check" size={16} color="#fff" style={{ marginRight: 8 }} />
-        <Text style={styles.submitBtnText}>Create Listing</Text>
+        <Text style={styles.submitBtnText}>Save Changes</Text>
       </Pressable>
     </ScrollView>
   );
@@ -332,6 +347,8 @@ export default function NewItemScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fa' },
   content: { paddingBottom: 40 },
+  notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  notFoundText: { fontSize: 16, color: '#718096' },
   section: {
     backgroundColor: '#fff',
     marginTop: 10,

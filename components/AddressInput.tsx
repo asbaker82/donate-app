@@ -30,6 +30,7 @@ interface Props {
   onChangeText: (text: string) => void;
   placeholder?: string;
   style?: object;
+  error?: boolean;
 }
 
 function formatAddress(result: NominatimResult): string {
@@ -45,7 +46,7 @@ function formatAddress(result: NominatimResult): string {
   return parts.join(', ') || result.display_name;
 }
 
-export default function AddressInput({ value, onChangeText, placeholder, style }: Props) {
+export default function AddressInput({ value, onChangeText, placeholder, style, error }: Props) {
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -108,7 +109,7 @@ export default function AddressInput({ value, onChangeText, placeholder, style }
 
   return (
     <View style={[styles.wrapper, style]}>
-      <View style={[styles.inputRow, open && styles.inputRowOpen]}>
+      <View style={[styles.inputRow, open && styles.inputRowOpen, error && styles.inputRowError]}>
         <FontAwesome name="map-marker" size={15} color="#2E8B57" style={styles.pin} />
         <TextInput
           style={styles.input}
@@ -170,6 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
     gap: 8,
   },
+  inputRowError: { borderColor: '#fc8181', backgroundColor: '#fff5f5' },
   inputRowOpen: {
     borderColor: '#2E8B57',
     borderBottomLeftRadius: 0,

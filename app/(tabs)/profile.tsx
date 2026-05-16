@@ -1,10 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Platform } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useRouter } from 'expo-router';
 import { useApp } from '@/store/AppContext';
 
 export default function ProfileScreen() {
-  const { currentUser, users, getMyItems, items } = useApp();
+  const router = useRouter();
+  const { currentUser, users, getMyItems, items, searchNotifications, updateSearchNotification, deleteSearchNotification } = useApp();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const myItems = getMyItems();
   const claimedByMe = items.filter(
@@ -13,10 +17,10 @@ export default function ProfileScreen() {
   const friendList = users.filter(u => currentUser.friends.includes(u.id));
 
   const stats = [
-    { label: 'Listed', value: myItems.length, icon: 'gift' as const, color: '#2E8B57' },
-    { label: 'Active', value: myItems.filter(i => i.status === 'available' || i.status === 'claimed').length, icon: 'check-circle' as const, color: '#3182ce' },
-    { label: 'Claimed by You', value: items.filter(i => i.claimedBy === currentUser.id).length, icon: 'hand-o-right' as const, color: '#d69e2e' },
-    { label: 'Friends', value: friendList.length, icon: 'users' as const, color: '#805ad5' },
+    { label: 'Listed', value: myItems.length, icon: 'gift' as const, color: '#2E8B57', filter: 'listed' as const },
+    { label: 'Active', value: myItems.filter(i => i.status === 'available' || i.status === 'claimed').length, icon: 'check-circle' as const, color: '#3182ce', filter: 'active' as const },
+    { label: 'Claimed by You', value: items.filter(i => i.claimedBy === currentUser.id).length, icon: 'hand-o-right' as const, color: '#d69e2e', filter: 'claimed' as const },
+    { label: 'Friends', value: friendList.length, icon: 'users' as const, color: '#805ad5', filter: null },
   ];
 
   return (
@@ -33,11 +37,24 @@ export default function ProfileScreen() {
 
       <View style={styles.statsRow}>
         {stats.map(stat => (
-          <View key={stat.label} style={styles.statCard}>
-            <FontAwesome name={stat.icon} size={20} color={stat.color} />
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-          </View>
+          stat.filter ? (
+            <Pressable
+              key={stat.label}
+              style={({ pressed }) => [styles.statCard, styles.statCardLink, pressed && styles.statCardPressed]}
+              onPress={() => router.push({ pathname: '/items-list', params: { filter: stat.filter } })}
+            >
+              <FontAwesome name={stat.icon} size={20} color={stat.color} />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+              <FontAwesome name="chevron-right" size={9} color="#cbd5e0" style={styles.statChevron} />
+            </Pressable>
+          ) : (
+            <View key={stat.label} style={styles.statCard}>
+              <FontAwesome name={stat.icon} size={20} color={stat.color} />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          )
         ))}
       </View>
 
@@ -61,6 +78,81 @@ export default function ProfileScreen() {
                 <Text style={styles.friendItemCountText}>
                   {items.filter(i => i.donorId === friend.id && (i.status === 'available' || i.status === 'claimed')).length} items
                 </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Search Alerts */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <FontAwesome name="bell" size={15} color="#2E8B57" style={{ marginRight: 8 }} />
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Search Alerts</Text>
+        </View>
+        {searchNotifications.length === 0 ? (
+          <Text style={styles.empty}>
+            No alerts yet. Search for an item and tap the{' '}
+            <FontAwesome name="bell" size={12} color="#a0aec0" /> bell to get a text when one is posted.
+          </Text>
+        ) : (
+          searchNotifications.map(notif => (
+            <View key={notif.id} style={styles.alertRow}>
+              {editingId === notif.id ? (
+                <TextInput
+                  style={styles.alertEditInput}
+                  value={editingText}
+                  onChangeText={setEditingText}
+                  autoFocus
+                  onSubmitEditing={() => {
+                    if (editingText.trim()) updateSearchNotification(notif.id, editingText.trim());
+                    setEditingId(null);
+                  }}
+                  returnKeyType="done"
+                />
+              ) : (
+                <>
+                  <FontAwesome name="bell" size={13} color="#2E8B57" style={styles.alertIcon} />
+                  <Text style={styles.alertKeyword}>{notif.keyword}</Text>
+                </>
+              )}
+              <View style={styles.alertActions}>
+                {editingId === notif.id ? (
+                  <Pressable
+                    style={styles.alertSaveBtn}
+                    onPress={() => {
+                      if (editingText.trim()) updateSearchNotification(notif.id, editingText.trim());
+                      setEditingId(null);
+                    }}
+                  >
+                    <Text style={styles.alertSaveBtnText}>Save</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={styles.alertIconBtn}
+                    onPress={() => { setEditingId(notif.id); setEditingText(notif.keyword); }}
+                    hitSlop={8}
+                  >
+                    <FontAwesome name="pencil" size={14} color="#718096" />
+                  </Pressable>
+                )}
+                <Pressable
+                  style={styles.alertIconBtn}
+                  hitSlop={8}
+                  onPress={() => {
+                    const doDelete = () => deleteSearchNotification(notif.id);
+                    if (Platform.OS === 'web') {
+                      if (window.confirm(`Delete alert for "${notif.keyword}"?`)) doDelete();
+                    } else {
+                      Alert.alert('Delete Alert', `Delete alert for "${notif.keyword}"?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: doDelete },
+                      ]);
+                    }
+                  }}
+                >
+                  <FontAwesome name="trash" size={14} color="#e53e3e" />
+                </Pressable>
               </View>
             </View>
           ))
@@ -123,6 +215,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  statCardLink: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  statCardPressed: { opacity: 0.7 },
+  statChevron: { marginTop: 4 },
   statValue: { fontSize: 22, fontWeight: '800', color: '#2d3748', marginTop: 6 },
   statLabel: { fontSize: 11, color: '#718096', marginTop: 2, textAlign: 'center' },
   section: {
@@ -137,7 +235,38 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#2d3748', marginBottom: 12 },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 10,
+  },
+  alertIcon: { width: 18 },
+  alertKeyword: { flex: 1, fontSize: 14, color: '#2d3748', fontWeight: '500' },
+  alertEditInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2d3748',
+    borderWidth: 1.5,
+    borderColor: '#2E8B57',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#f0fff4',
+  },
+  alertActions: { flexDirection: 'row', gap: 12 },
+  alertIconBtn: { padding: 4 },
+  alertSaveBtn: {
+    backgroundColor: '#2E8B57',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  alertSaveBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   empty: { color: '#a0aec0', fontSize: 14 },
   friendRow: {
     flexDirection: 'row',

@@ -9,6 +9,11 @@ import {
   Alert,
   Platform,
   Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 
 function confirm(message: string): boolean {
@@ -16,6 +21,16 @@ function confirm(message: string): boolean {
     return window.confirm(message);
   }
   return false;
+}
+
+function openSms(phone: string, body: string) {
+  const encoded = encodeURIComponent(body);
+  // iOS uses & separator, Android/web use ?
+  const url =
+    Platform.OS === 'ios'
+      ? `sms:${phone}&body=${encoded}`
+      : `sms:${phone}?body=${encoded}`;
+  Linking.openURL(url);
 }
 
 function openDirections(address: string) {
@@ -28,12 +43,16 @@ function openDirections(address: string) {
 }
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import * as Haptics from 'expo-haptics';
 import { useApp } from '@/store/AppContext';
 import {
   DISPOSAL_METHOD_LABELS,
   CONDITION_LABELS,
   CONDITION_COLORS,
 } from '@/store/types';
+import ImageLightbox from '@/components/ImageLightbox';
+import ClaimCelebration from '@/components/ClaimCelebration';
+import WaitlistToast from '@/components/WaitlistToast';
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,6 +70,12 @@ export default function ItemDetailScreen() {
   } = useApp();
 
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [showWaitlistToast, setShowWaitlistToast] = useState(false);
+  const [smsVisible, setSmsVisible] = useState(false);
+  const [smsMessage, setSmsMessage] = useState('');
 
   const item = items.find(i => i.id === id);
   if (!item) {
@@ -76,10 +101,18 @@ export default function ItemDetailScreen() {
     ? Math.max(0, Math.ceil((claimDeadline.getTime() - Date.now()) / 3600000))
     : null;
 
+  const doClaim = () => {
+    claimItem(item.id);
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setShowCelebration(true);
+  };
+
   const handleClaim = () => {
     if (Platform.OS === 'web') {
       if (confirm(`Claim "${item.title}"? You'll have ${item.claimPickupHours} hours to arrange pickup.`)) {
-        claimItem(item.id);
+        doClaim();
       }
       return;
     }
@@ -88,7 +121,7 @@ export default function ItemDetailScreen() {
       `Claim "${item.title}"? You'll have ${item.claimPickupHours} hours to arrange pickup.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Claim', onPress: () => claimItem(item.id) },
+        { text: 'Claim', onPress: doClaim },
       ]
     );
   };
@@ -145,19 +178,23 @@ export default function ItemDetailScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.content}>
       {/* Photos */}
       <View style={styles.photoSection}>
         {item.photos.length > 0 ? (
           <>
-            <Image source={{ uri: item.photos[photoIndex] }} style={styles.mainPhoto} />
+            <Pressable onPress={() => { setLightboxIndex(photoIndex); setLightboxOpen(true); }}>
+              <Image source={{ uri: item.photos[photoIndex] }} style={styles.mainPhoto} resizeMode="contain" />
+            </Pressable>
             {item.photos.length > 1 && (
               <ScrollView horizontal style={styles.thumbRow} showsHorizontalScrollIndicator={false}>
                 {item.photos.map((uri, i) => (
-                  <Pressable key={i} onPress={() => setPhotoIndex(i)}>
+                  <Pressable key={i} onPress={() => { setPhotoIndex(i); setLightboxIndex(i); setLightboxOpen(true); }}>
                     <Image
                       source={{ uri }}
                       style={[styles.thumb, i === photoIndex && styles.thumbActive]}
+                      resizeMode="cover"
                     />
                   </Pressable>
                 ))}
@@ -307,7 +344,16 @@ export default function ItemDetailScreen() {
         )}
 
         {!isMyItem && item.status === 'claimed' && !isClaimedByMe && !isOnWaitlist && (
-          <Pressable style={styles.secondaryBtn} onPress={() => joinWaitlist(item.id)}>
+          <Pressable
+            style={styles.secondaryBtn}
+            onPress={() => {
+              joinWaitlist(item.id);
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }
+              setShowWaitlistToast(true);
+            }}
+          >
             <FontAwesome name="list" size={15} color="#2E8B57" style={{ marginRight: 8 }} />
             <Text style={styles.secondaryBtnText}>Join Waitlist</Text>
           </Pressable>
@@ -334,13 +380,112 @@ export default function ItemDetailScreen() {
         )}
 
         {isMyItem && (
-          <Pressable style={styles.dangerBtn} onPress={handleDeleteItem}>
-            <FontAwesome name="trash" size={14} color="#e53e3e" style={{ marginRight: 8 }} />
-            <Text style={styles.dangerBtnText}>Remove Listing</Text>
+          <View style={styles.btnGroup}>
+            <Pressable style={styles.editBtn} onPress={() => router.push(`/item/edit/${item.id}`)}>
+              <FontAwesome name="pencil" size={14} color="#2E8B57" style={{ marginRight: 8 }} />
+              <Text style={styles.editBtnText}>Edit Listing</Text>
+            </Pressable>
+            <Pressable style={styles.dangerBtn} onPress={handleDeleteItem}>
+              <FontAwesome name="trash" size={14} color="#e53e3e" style={{ marginRight: 8 }} />
+              <Text style={styles.dangerBtnText}>Remove Listing</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Text donor — shown to donees when donor has a phone on file */}
+        {!isMyItem && donor?.phone && (
+          <Pressable
+            style={styles.smsBtn}
+            onPress={() => {
+              setSmsMessage(`Hi ${donor.name}! I'm interested in your "${item.title}". When can I pick this up?`);
+              setSmsVisible(true);
+            }}
+          >
+            <FontAwesome name="comment" size={15} color="#3182ce" style={{ marginRight: 8 }} />
+            <Text style={styles.smsBtnText}>Text Donor</Text>
           </Pressable>
         )}
       </View>
     </ScrollView>
+
+      {/* Claim celebration overlay */}
+      <ClaimCelebration
+        visible={showCelebration}
+        onComplete={() => setShowCelebration(false)}
+      />
+
+      {/* Waitlist toast */}
+      <WaitlistToast
+        visible={showWaitlistToast}
+        onComplete={() => setShowWaitlistToast(false)}
+      />
+
+      {/* Photo lightbox */}
+      <ImageLightbox
+        images={item.photos}
+        initialIndex={lightboxIndex}
+        visible={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
+
+      {/* SMS compose modal */}
+      <Modal
+        visible={smsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSmsVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalCard}
+            >
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Text {donor?.name}</Text>
+                  <Text style={styles.modalSubtitle}>{donor?.phone}</Text>
+                </View>
+                <Pressable onPress={() => setSmsVisible(false)} style={styles.modalClose}>
+                  <FontAwesome name="times" size={18} color="#718096" />
+                </Pressable>
+              </View>
+
+              <Text style={styles.modalLabel}>About</Text>
+              <View style={styles.modalItemChip}>
+                <FontAwesome name="tag" size={12} color="#2E8B57" style={{ marginRight: 6 }} />
+                <Text style={styles.modalItemChipText} numberOfLines={1}>{item.title}</Text>
+              </View>
+
+              <Text style={styles.modalLabel}>Message</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={smsMessage}
+                onChangeText={setSmsMessage}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                placeholder="Type your message…"
+                placeholderTextColor="#a0aec0"
+                autoFocus
+              />
+
+              <Pressable
+                style={[styles.modalSendBtn, !smsMessage.trim() && styles.modalSendBtnDisabled]}
+                disabled={!smsMessage.trim()}
+                onPress={() => {
+                  setSmsVisible(false);
+                  openSms(donor!.phone!, smsMessage.trim());
+                }}
+              >
+                <FontAwesome name="send" size={14} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.modalSendBtnText}>Open Messages</Text>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
   );
 }
 
@@ -363,7 +508,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 40 },
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFoundText: { fontSize: 16, color: '#718096' },
-  photoSection: { backgroundColor: '#fff' },
+  photoSection: { backgroundColor: '#111' },
   mainPhoto: { width: '100%', height: 280 },
   thumbRow: { paddingHorizontal: 12, paddingVertical: 8 },
   thumb: {
@@ -469,6 +614,17 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   ghostBtnText: { fontSize: 15, fontWeight: '600', color: '#718096' },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0fff4',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#2E8B57',
+    paddingVertical: 13,
+  },
+  editBtnText: { fontSize: 15, fontWeight: '700', color: '#2E8B57' },
   dangerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -480,4 +636,76 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   dangerBtnText: { fontSize: 15, fontWeight: '600', color: '#e53e3e' },
+  smsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ebf8ff',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#90cdf4',
+    paddingVertical: 13,
+  },
+  smsBtnText: { fontSize: 15, fontWeight: '700', color: '#3182ce' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 36,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#1a202c' },
+  modalSubtitle: { fontSize: 14, color: '#718096', marginTop: 2 },
+  modalClose: { padding: 4 },
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#a0aec0',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  modalItemChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fff4',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+  },
+  modalItemChipText: { fontSize: 13, color: '#2E8B57', fontWeight: '600' },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: '#2d3748',
+    minHeight: 110,
+    marginBottom: 16,
+    backgroundColor: '#fafafa',
+  },
+  modalSendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3182ce',
+    borderRadius: 12,
+    paddingVertical: 14,
+  },
+  modalSendBtnDisabled: { opacity: 0.4 },
+  modalSendBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });

@@ -23,7 +23,7 @@ export default function ItemCard({ item, onPress }: Props) {
     <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} onPress={onPress}>
       <View style={styles.photoArea}>
         {item.photos.length > 0 ? (
-          <Image source={{ uri: item.photos[0] }} style={styles.photo} />
+          <Image source={{ uri: item.photos[0] }} style={styles.photo} resizeMode="contain" />
         ) : (
           <View style={styles.photoPlaceholder}>
             <FontAwesome name="image" size={36} color="#cbd5e0" />
@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
   photoArea: {
     height: 160,
     position: 'relative',
+    backgroundColor: '#111',
   },
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: {

@@ -51,6 +51,22 @@ function RootLayoutNav() {
             name="item/new"
             options={{ title: 'New Listing', presentation: 'modal' }}
           />
+          <Stack.Screen
+            name="item/edit/[id]"
+            options={{ title: 'Edit Listing', presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="items-list"
+            options={({ route }) => {
+              const filter = (route.params as any)?.filter;
+              const titles: Record<string, string> = {
+                listed: 'My Listings',
+                active: 'Active Listings',
+                claimed: 'Claimed by You',
+              };
+              return { title: titles[filter] ?? 'Items', headerBackTitle: 'Back' };
+            }}
+          />
         </Stack>
       </ThemeProvider>
     </AppProvider>

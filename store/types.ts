@@ -31,10 +31,17 @@ export interface Item {
   createdAt: string;
 }
 
+export interface SearchNotification {
+  id: string;
+  keyword: string;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   friends: string[];
 }
 

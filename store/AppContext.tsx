@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Item, User } from './types';
+import { Item, User, SearchNotification } from './types';
 import { MOCK_USERS, MOCK_ITEMS } from './mockData';
 
 interface AppContextType {
@@ -18,6 +18,15 @@ interface AppContextType {
   releaseClaim: (itemId: string) => void;
   markPickedUp: (itemId: string) => void;
   markDisposed: (itemId: string) => void;
+  // Search history
+  searchHistory: string[];
+  addToSearchHistory: (term: string) => void;
+  clearSearchHistory: () => void;
+  // Search notifications
+  searchNotifications: SearchNotification[];
+  addSearchNotification: (keyword: string) => boolean; // returns true if keyword already exists
+  updateSearchNotification: (id: string, keyword: string) => void;
+  deleteSearchNotification: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -26,6 +35,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser] = useState<User>(MOCK_USERS[0]);
   const [users] = useState<User[]>(MOCK_USERS);
   const [items, setItems] = useState<Item[]>(MOCK_ITEMS);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchNotifications, setSearchNotifications] = useState<SearchNotification[]>([]);
 
   const processExpiredClaims = useCallback(() => {
     setItems(prev =>
@@ -161,6 +172,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
+  const addToSearchHistory = (term: string) => {
+    const t = term.trim();
+    if (!t) return;
+    setSearchHistory(prev => {
+      const deduped = prev.filter(h => h.toLowerCase() !== t.toLowerCase());
+      return [t, ...deduped].slice(0, 10);
+    });
+  };
+
+  const clearSearchHistory = () => setSearchHistory([]);
+
+  const addSearchNotification = (keyword: string): boolean => {
+    const k = keyword.trim().toLowerCase();
+    if (!k) return false;
+    const exists = searchNotifications.some(n => n.keyword.toLowerCase() === k);
+    if (exists) return true;
+    setSearchNotifications(prev => [
+      { id: `notif-${Date.now()}`, keyword: keyword.trim(), createdAt: new Date().toISOString() },
+      ...prev,
+    ]);
+    return false;
+  };
+
+  const updateSearchNotification = (id: string, keyword: string) =>
+    setSearchNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, keyword: keyword.trim() } : n))
+    );
+
+  const deleteSearchNotification = (id: string) =>
+    setSearchNotifications(prev => prev.filter(n => n.id !== id));
+
   return (
     <AppContext.Provider
       value={{
@@ -179,6 +221,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         releaseClaim,
         markPickedUp,
         markDisposed,
+        searchHistory,
+        addToSearchHistory,
+        clearSearchHistory,
+        searchNotifications,
+        addSearchNotification,
+        updateSearchNotification,
+        deleteSearchNotification,
       }}
     >
       {children}
