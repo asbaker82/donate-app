@@ -44,6 +44,7 @@ function openDirections(address: string) {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Haptics from 'expo-haptics';
+import { playClaimSound, playWaitlistSound } from '@/utils/sounds';
 import { useApp } from '@/store/AppContext';
 import {
   DISPOSAL_METHOD_LABELS,
@@ -103,6 +104,7 @@ export default function ItemDetailScreen() {
 
   const doClaim = () => {
     claimItem(item.id);
+    playClaimSound();
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -348,6 +350,7 @@ export default function ItemDetailScreen() {
             style={styles.secondaryBtn}
             onPress={() => {
               joinWaitlist(item.id);
+              playWaitlistSound();
               if (Platform.OS !== 'web') {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               }
