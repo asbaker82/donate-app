@@ -14,11 +14,15 @@ export default function ItemCard({ item, onPress, distance }: Props) {
   const { getUserById } = useApp();
   const donor = getUserById(item.donorId);
 
-  const disposalDate = new Date(item.disposalDate);
-  const daysLeft = Math.ceil((disposalDate.getTime() - Date.now()) / 86400000);
-  const isUrgent = daysLeft <= 3;
+  const isBorrow = item.listingType === 'borrow';
 
-  const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.available;
+  const disposalDate = isBorrow ? null : new Date(item.disposalDate);
+  const daysLeft = disposalDate ? Math.ceil((disposalDate.getTime() - Date.now()) / 86400000) : null;
+  const isUrgent = daysLeft !== null && daysLeft <= 3;
+
+  const statusStyle = isBorrow
+    ? BORROW_STATUS_STYLES[item.status] ?? BORROW_STATUS_STYLES.available
+    : STATUS_STYLES[item.status] ?? STATUS_STYLES.available;
 
   return (
     <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} onPress={onPress}>
@@ -32,9 +36,14 @@ export default function ItemCard({ item, onPress, distance }: Props) {
         )}
         <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
           <Text style={[styles.statusText, { color: statusStyle.text }]}>
-            {STATUS_LABELS[item.status]}
+            {isBorrow ? BORROW_STATUS_LABELS[item.status] ?? 'Borrow' : STATUS_LABELS[item.status]}
           </Text>
         </View>
+        {isBorrow && (
+          <View style={styles.lendBadge}>
+            <Text style={styles.lendBadgeText}>LEND</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.body}>
@@ -66,23 +75,38 @@ export default function ItemCard({ item, onPress, distance }: Props) {
                 </Text>
               </View>
             )}
-            <View style={[styles.timeChip, isUrgent && styles.timeChipUrgent]}>
-              <FontAwesome
-                name="clock-o"
-                size={11}
-                color={isUrgent ? '#c53030' : '#718096'}
-                style={{ marginRight: 3 }}
-              />
-              <Text style={[styles.timeText, isUrgent && styles.timeTextUrgent]}>
-                {daysLeft <= 0 ? 'Expired' : daysLeft === 1 ? 'Last day!' : `${daysLeft}d left`}
-              </Text>
-            </View>
+            {!isBorrow && daysLeft !== null && (
+              <View style={[styles.timeChip, isUrgent && styles.timeChipUrgent]}>
+                <FontAwesome
+                  name="clock-o"
+                  size={11}
+                  color={isUrgent ? '#c53030' : '#718096'}
+                  style={{ marginRight: 3 }}
+                />
+                <Text style={[styles.timeText, isUrgent && styles.timeTextUrgent]}>
+                  {daysLeft <= 0 ? 'Expired' : daysLeft === 1 ? 'Last day!' : `${daysLeft}d left`}
+                </Text>
+              </View>
+            )}
+            {isBorrow && item.borrowedUntil && item.status === 'borrowed' && (
+              <View style={styles.timeChip}>
+                <FontAwesome name="calendar" size={10} color="#718096" style={{ marginRight: 3 }} />
+                <Text style={styles.timeText}>
+                  Until {new Date(item.borrowedUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
-        {item.waitlist.length > 0 && (
+        {!isBorrow && item.waitlist.length > 0 && (
           <Text style={styles.waitlistText}>
             {item.waitlist.length} {item.waitlist.length === 1 ? 'person' : 'people'} on waitlist
+          </Text>
+        )}
+        {isBorrow && item.borrowRequests.filter(r => r.status === 'pending').length > 0 && (
+          <Text style={styles.waitlistText}>
+            {item.borrowRequests.filter(r => r.status === 'pending').length} pending {item.borrowRequests.filter(r => r.status === 'pending').length === 1 ? 'request' : 'requests'}
           </Text>
         )}
       </View>
@@ -115,6 +139,18 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   pending_pickup:  { bg: '#9DB7C9',  text: CREAM },
   picked_up:       { bg: SAGE,       text: CREAM },
   disposed:        { bg: '#B0A89E',  text: CREAM },
+};
+
+const BORROW_STATUS_LABELS: Record<string, string> = {
+  available:       'Available',
+  borrowed:        'Borrowed',
+  pending_return:  'Returning',
+};
+
+const BORROW_STATUS_STYLES: Record<string, { bg: string; text: string }> = {
+  available:       { bg: '#7BA7BC',  text: CREAM },
+  borrowed:        { bg: '#F4C95D',  text: INK   },
+  pending_return:  { bg: SAGE,       text: CREAM },
 };
 
 const styles = StyleSheet.create({
@@ -207,4 +243,14 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 12, color: MUTE, fontWeight: '600' },
   timeTextUrgent: { color: '#C53030' },
   waitlistText: { fontSize: 12, color: '#8A3A3A', marginTop: 6, fontWeight: '600' },
+  lendBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#7BA7BC',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  lendBadgeText: { fontSize: 10, fontWeight: '800', color: CREAM, letterSpacing: 1 },
 });

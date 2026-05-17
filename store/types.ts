@@ -8,7 +8,31 @@ export type DisposalMethod =
   | 'keep';
 
 export type ItemCondition = 'excellent' | 'good' | 'fair' | 'poor';
-export type ItemStatus = 'available' | 'claimed' | 'pending_pickup' | 'picked_up' | 'disposed';
+export type ItemStatus =
+  | 'available'
+  | 'claimed'
+  | 'pending_pickup'
+  | 'picked_up'
+  | 'disposed'
+  | 'borrowed'
+  | 'pending_return';
+
+export type ListingType = 'give' | 'borrow';
+
+export interface BorrowRequest {
+  id: string;
+  requesterId: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  status: 'pending' | 'approved' | 'rejected' | 'returned';
+  createdAt: string;
+}
+
+export interface BlockedPeriod {
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
+  note?: string;
+}
 
 export interface Item {
   id: string;
@@ -29,6 +53,12 @@ export interface Item {
   claimDeadline?: string;
   waitlist: string[];
   createdAt: string;
+  // Borrow-specific fields
+  listingType: ListingType;
+  borrowRequests: BorrowRequest[];
+  blockedPeriods: BlockedPeriod[];
+  borrowedBy?: string;
+  borrowedUntil?: string;
 }
 
 export interface SearchNotification {

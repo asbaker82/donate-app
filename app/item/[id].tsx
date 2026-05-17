@@ -24,7 +24,9 @@ import { useApp } from '@/store/AppContext';
 import {
   DISPOSAL_METHOD_LABELS,
   CONDITION_LABELS,
+  BlockedPeriod,
 } from '@/store/types';
+import DatePickerInput from '@/components/DatePickerInput';
 import ImageLightbox from '@/components/ImageLightbox';
 import { geocodeAddress, haversineMiles } from '@/utils/geocode';
 import ClaimToast from '@/components/ClaimToast';
@@ -69,6 +71,16 @@ function openDirections(address: string) {
   Linking.openURL(url);
 }
 
+function datesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart <= bEnd && aEnd >= bStart;
+}
+
+function periodsConflict(start: string, end: string, blocked: BlockedPeriod[], requests: import('@/store/types').BorrowRequest[]): boolean {
+  if (blocked.some(p => datesOverlap(start, end, p.start, p.end))) return true;
+  if (requests.some(r => r.status === 'approved' && datesOverlap(start, end, r.startDate, r.endDate))) return true;
+  return false;
+}
+
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -84,6 +96,13 @@ export default function ItemDetailScreen() {
     markPickedUp,
     confirmPickup,
     deleteItem,
+    createBorrowRequest,
+    approveBorrowRequest,
+    rejectBorrowRequest,
+    markBorrowReturned,
+    confirmBorrowReturn,
+    addBlockedPeriod,
+    removeBlockedPeriod,
   } = useApp();
 
   const [photoIndex, setPhotoIndex]           = useState(0);
@@ -97,6 +116,11 @@ export default function ItemDetailScreen() {
   const [smsVisible, setSmsVisible]   = useState(false);
   const [smsMessage, setSmsMessage]   = useState('');
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
+  const [borrowStart, setBorrowStart] = useState('');
+  const [borrowEnd, setBorrowEnd]     = useState('');
+  const [blockedStart, setBlockedStart] = useState('');
+  const [blockedEnd, setBlockedEnd]   = useState('');
+  const [showBlockedForm, setShowBlockedForm] = useState(false);
 
   const item = items.find(i => i.id === id);
 
@@ -127,10 +151,20 @@ export default function ItemDetailScreen() {
   const isMyItem       = item.donorId === currentUser.id;
   const isClaimedByMe  = item.claimedBy === currentUser.id;
   const isOnWaitlist   = item.waitlist.includes(currentUser.id);
+  const isBorrow       = item.listingType === 'borrow';
 
-  const disposalDate = new Date(item.disposalDate);
-  const daysLeft     = Math.ceil((disposalDate.getTime() - Date.now()) / 86400000);
-  const isUrgent     = daysLeft <= 3;
+  const disposalDate = isBorrow ? null : new Date(item.disposalDate);
+  const daysLeft     = disposalDate ? Math.ceil((disposalDate.getTime() - Date.now()) / 86400000) : null;
+  const isUrgent     = daysLeft !== null && daysLeft <= 3;
+
+  // Borrow-specific
+  const myBorrowRequest = item.borrowRequests.find(r => r.requesterId === currentUser.id && (r.status === 'pending' || r.status === 'approved'));
+  const pendingRequests  = item.borrowRequests.filter(r => r.status === 'pending');
+  const isBorrowedByMe   = item.borrowedBy === currentUser.id;
+  const borrowedByUser   = item.borrowedBy ? getUserById(item.borrowedBy) : null;
+
+  const borrowRequestValid = borrowStart && borrowEnd && borrowEnd >= borrowStart &&
+    !periodsConflict(borrowStart, borrowEnd, item.blockedPeriods, item.borrowRequests);
 
   const claimDeadline  = item.claimDeadline ? new Date(item.claimDeadline) : null;
   const hoursToPickup  = claimDeadline
@@ -177,13 +211,17 @@ export default function ItemDetailScreen() {
   };
 
   // ── Status badge config ──────────────────────────────────────
-  const statusConfig = {
+  const statusConfig = (isBorrow ? {
+    available:       { label: 'Available to Borrow', bg: '#7BA7BC', text: CREAM  },
+    borrowed:        { label: 'Borrowed',             bg: '#F4C95D', text: INK    },
+    pending_return:  { label: 'Return Pending',       bg: SAGE,      text: CREAM  },
+  } : {
     available:       { label: 'Free',         bg: TANGERINE,   text: CREAM  },
     claimed:         { label: 'Claimed',       bg: '#F4C95D',   text: INK    },
     pending_pickup:  { label: 'Pending Pickup', bg: '#9DB7C9',  text: CREAM  },
     picked_up:       { label: 'Picked Up',     bg: SAGE,        text: CREAM  },
     disposed:        { label: 'Gone',          bg: '#B0A89E',   text: CREAM  },
-  }[item.status] ?? { label: item.status, bg: CREAM_2, text: INK };
+  })[item.status] ?? { label: item.status, bg: CREAM_2, text: INK };
 
   const hasPhotos = item.photos.length > 0;
 
@@ -346,22 +384,40 @@ export default function ItemDetailScreen() {
           {/* Description */}
           <Text style={styles.description}>{item.description}</Text>
 
-          {/* Details grid */}
-          <View style={styles.detailsGrid}>
-            {[
-              { k: 'Pickup',      v: item.pickupLocation },
-              { k: 'Window',      v: item.pickupWindow },
-              { k: 'Claim within', v: `${item.claimPickupHours}h of claiming` },
-              { k: 'Disposal',    v: `${disposalDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${daysLeft <= 0 ? 'expired' : daysLeft === 1 ? 'last day' : `${daysLeft}d left`}${isUrgent ? ' ⚠️' : ''}` },
-            ].map((d, i) => (
-              <View key={d.k} style={[styles.detailRow, i > 0 && styles.detailRowBorder]}>
-                <Text style={styles.detailKey}>{d.k}</Text>
-                <Text style={[styles.detailVal, d.k === 'Disposal' && isUrgent && { color: '#C53030' }]}>
-                  {d.v}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {/* Details grid — Give Away */}
+          {!isBorrow && (
+            <View style={styles.detailsGrid}>
+              {[
+                { k: 'Pickup',      v: item.pickupLocation },
+                { k: 'Window',      v: item.pickupWindow },
+                { k: 'Claim within', v: `${item.claimPickupHours}h of claiming` },
+                { k: 'Disposal',    v: disposalDate ? `${disposalDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${daysLeft! <= 0 ? 'expired' : daysLeft === 1 ? 'last day' : `${daysLeft}d left`}${isUrgent ? ' ⚠️' : ''}` : '' },
+              ].map((d, i) => (
+                <View key={d.k} style={[styles.detailRow, i > 0 && styles.detailRowBorder]}>
+                  <Text style={styles.detailKey}>{d.k}</Text>
+                  <Text style={[styles.detailVal, d.k === 'Disposal' && isUrgent && { color: '#C53030' }]}>
+                    {d.v}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Details grid — Borrow */}
+          {isBorrow && (
+            <View style={styles.detailsGrid}>
+              {[
+                { k: 'Pickup',    v: item.pickupLocation },
+                { k: 'Availability', v: item.pickupWindow },
+                item.borrowedUntil ? { k: 'Borrowed until', v: new Date(item.borrowedUntil + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) } : null,
+              ].filter(Boolean).map((d, i) => (
+                <View key={d!.k} style={[styles.detailRow, i > 0 && styles.detailRowBorder]}>
+                  <Text style={styles.detailKey}>{d!.k}</Text>
+                  <Text style={styles.detailVal}>{d!.v}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Pickup / directions card */}
           <Pressable style={styles.mapCard} onPress={() => openDirections(item.pickupLocation)}>
@@ -378,20 +434,144 @@ export default function ItemDetailScreen() {
             <FontAwesome name="location-arrow" size={14} color={MUTE} />
           </Pressable>
 
-          {/* Disposal destination */}
-          <View style={styles.disposalCard}>
-            <FontAwesome name="heart" size={14} color={MUTE} style={{ marginTop: 1 }} />
-            <Text style={styles.disposalText}>
-              If unclaimed, goes to{' '}
-              <Text style={{ color: INK_2, fontWeight: '600' }}>
-                {DISPOSAL_METHOD_LABELS[item.disposalMethod]}
-                {item.disposalMethodNote ? ` — ${item.disposalMethodNote}` : ''}
+          {/* Disposal destination — Give Away only */}
+          {!isBorrow && (
+            <View style={styles.disposalCard}>
+              <FontAwesome name="heart" size={14} color={MUTE} style={{ marginTop: 1 }} />
+              <Text style={styles.disposalText}>
+                If unclaimed, goes to{' '}
+                <Text style={{ color: INK_2, fontWeight: '600' }}>
+                  {DISPOSAL_METHOD_LABELS[item.disposalMethod]}
+                  {item.disposalMethodNote ? ` — ${item.disposalMethodNote}` : ''}
+                </Text>
               </Text>
-            </Text>
-          </View>
+            </View>
+          )}
 
-          {/* Claimant + Waitlist */}
-          {(item.claimedBy || item.waitlist.length > 0) && (
+          {/* Blocked periods — Borrow lender view */}
+          {isBorrow && isMyItem && (
+            <View style={styles.blockedCard}>
+              <View style={styles.blockedCardHeader}>
+                <FontAwesome name="ban" size={14} color={MUTE} />
+                <Text style={styles.blockedCardTitle}>Blocked Periods</Text>
+                <Pressable onPress={() => setShowBlockedForm(v => !v)} style={styles.blockedAddBtn}>
+                  <FontAwesome name={showBlockedForm ? 'minus' : 'plus'} size={12} color={CREAM} />
+                </Pressable>
+              </View>
+              {item.blockedPeriods.length === 0 && !showBlockedForm && (
+                <Text style={styles.blockedEmpty}>No dates blocked — tap + to add</Text>
+              )}
+              {item.blockedPeriods.map((p, i) => (
+                <View key={i} style={styles.blockedRow}>
+                  <Text style={styles.blockedRowText}>
+                    {new Date(p.start + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {' – '}
+                    {new Date(p.end + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                  <Pressable onPress={() => removeBlockedPeriod(item.id, i)}>
+                    <FontAwesome name="times" size={13} color={MUTE} />
+                  </Pressable>
+                </View>
+              ))}
+              {showBlockedForm && (
+                <View style={{ marginTop: 10, zIndex: 20 }}>
+                  <Text style={styles.blockedFormLabel}>Start date</Text>
+                  <DatePickerInput value={blockedStart} onChange={setBlockedStart} />
+                  {blockedStart && (
+                    <>
+                      <Text style={[styles.blockedFormLabel, { marginTop: 10 }]}>End date</Text>
+                      <DatePickerInput value={blockedEnd} onChange={setBlockedEnd} />
+                    </>
+                  )}
+                  {blockedStart && blockedEnd && (
+                    <Pressable
+                      style={styles.blockedSaveBtn}
+                      onPress={() => {
+                        addBlockedPeriod(item.id, { start: blockedStart, end: blockedEnd });
+                        setBlockedStart('');
+                        setBlockedEnd('');
+                        setShowBlockedForm(false);
+                      }}
+                    >
+                      <Text style={styles.blockedSaveBtnText}>Save Blocked Period</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Pending borrow requests — donor view */}
+          {isBorrow && isMyItem && pendingRequests.length > 0 && (
+            <View style={styles.borrowRequestsCard}>
+              <Text style={styles.borrowRequestsTitle}>
+                {pendingRequests.length} Pending {pendingRequests.length === 1 ? 'Request' : 'Requests'}
+              </Text>
+              {pendingRequests.map(req => {
+                const requester = getUserById(req.requesterId);
+                return (
+                  <View key={req.id} style={styles.borrowRequestRow}>
+                    <View style={styles.borrowRequestInfo}>
+                      <Text style={styles.borrowRequestName}>{requester?.name ?? 'Someone'}</Text>
+                      <Text style={styles.borrowRequestDates}>
+                        {new Date(req.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {' – '}
+                        {new Date(req.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </Text>
+                    </View>
+                    <View style={styles.borrowRequestActions}>
+                      <Pressable style={styles.approveBtn} onPress={() => approveBorrowRequest(item.id, req.id)}>
+                        <FontAwesome name="check" size={12} color={CREAM} />
+                        <Text style={styles.approveBtnText}>Approve</Text>
+                      </Pressable>
+                      <Pressable style={styles.rejectBtn} onPress={() => rejectBorrowRequest(item.id, req.id)}>
+                        <FontAwesome name="times" size={12} color={MUTE} />
+                        <Text style={styles.rejectBtnText}>Decline</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* My borrow request status — donee view */}
+          {isBorrow && !isMyItem && myBorrowRequest && (
+            <View style={styles.myRequestCard}>
+              <FontAwesome
+                name={myBorrowRequest.status === 'approved' ? 'check-circle' : 'clock-o'}
+                size={16}
+                color={myBorrowRequest.status === 'approved' ? SAGE : TANGERINE}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.myRequestLabel}>
+                  {myBorrowRequest.status === 'approved' ? 'Request approved!' : 'Request pending'}
+                </Text>
+                <Text style={styles.myRequestDates}>
+                  {new Date(myBorrowRequest.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {' – '}
+                  {new Date(myBorrowRequest.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Currently borrowed info — both views */}
+          {isBorrow && item.status === 'borrowed' && (
+            <View style={styles.borrowedCard}>
+              <FontAwesome name="calendar-check-o" size={14} color='#7BA7BC' style={{ marginTop: 1 }} />
+              <Text style={styles.borrowedText}>
+                {isMyItem
+                  ? `Borrowed by ${borrowedByUser?.name ?? 'someone'}`
+                  : isBorrowedByMe ? 'You have this borrowed'
+                  : `Currently borrowed`}
+                {item.borrowedUntil ? ` until ${new Date(item.borrowedUntil + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+              </Text>
+            </View>
+          )}
+
+          {/* Claimant + Waitlist — Give Away only */}
+          {!isBorrow && (item.claimedBy || item.waitlist.length > 0) && (
             <View style={styles.waitlistCard}>
               <View style={styles.waitlistAvatarRow}>
                 {/* Claimant avatar — always first */}
@@ -449,15 +629,86 @@ export default function ItemDetailScreen() {
 
       {/* ── Sticky bottom CTA ────────────────────────────────── */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        {/* Primary action */}
-        {!isMyItem && item.status === 'available' && (
+
+        {/* Borrow CTAs */}
+        {isBorrow && !isMyItem && !myBorrowRequest && item.status === 'available' && (
+          <View style={styles.borrowRequestForm}>
+            <Text style={styles.borrowFormTitle}>Request to Borrow</Text>
+            <View style={{ zIndex: 30 }}>
+              <Text style={styles.borrowFormLabel}>Start date</Text>
+              <DatePickerInput value={borrowStart} onChange={setBorrowStart} />
+            </View>
+            {borrowStart && (
+              <View style={{ zIndex: 20, marginTop: 10 }}>
+                <Text style={styles.borrowFormLabel}>Return by</Text>
+                <DatePickerInput value={borrowEnd} onChange={setBorrowEnd} />
+              </View>
+            )}
+            {borrowStart && borrowEnd && !borrowRequestValid && (
+              <Text style={styles.borrowConflictText}>Those dates conflict with an existing booking or blocked period.</Text>
+            )}
+            {borrowStart && borrowEnd && (
+              <Pressable
+                style={[styles.primaryBtn, !borrowRequestValid && { opacity: 0.4 }]}
+                onPress={() => {
+                  if (!borrowRequestValid) return;
+                  createBorrowRequest(item.id, borrowStart, borrowEnd);
+                  setBorrowStart('');
+                  setBorrowEnd('');
+                  if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }}
+                disabled={!borrowRequestValid}
+              >
+                <Text style={styles.primaryBtnText}>Send Request →</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {isBorrow && !isMyItem && myBorrowRequest?.status === 'pending' && (
+          <View style={styles.doneBar}>
+            <FontAwesome name="clock-o" size={14} color={MUTE} style={{ marginRight: 8 }} />
+            <Text style={styles.doneText}>Borrow request sent — waiting for approval</Text>
+          </View>
+        )}
+
+        {isBorrow && !isMyItem && isBorrowedByMe && item.status === 'borrowed' && (
+          <Pressable style={styles.primaryBtn} onPress={() => {
+            if (Platform.OS === 'web') {
+              if (window.confirm('Mark this item as returned?')) markBorrowReturned(item.id);
+            } else {
+              Alert.alert('Mark as Returned', 'Confirm that you have returned this item?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Yes, Returned', onPress: () => markBorrowReturned(item.id) },
+              ]);
+            }
+          }}>
+            <Text style={styles.primaryBtnText}>Mark as Returned ✓</Text>
+          </Pressable>
+        )}
+
+        {isBorrow && !isMyItem && isBorrowedByMe && item.status === 'pending_return' && (
+          <View style={styles.doneBar}>
+            <FontAwesome name="clock-o" size={14} color={MUTE} style={{ marginRight: 8 }} />
+            <Text style={styles.doneText}>Return submitted — waiting for owner to confirm</Text>
+          </View>
+        )}
+
+        {isBorrow && isMyItem && item.status === 'pending_return' && (
+          <Pressable style={styles.primaryBtn} onPress={() => confirmBorrowReturn(item.id)}>
+            <Text style={styles.primaryBtnText}>Confirm Return ✓</Text>
+          </Pressable>
+        )}
+
+        {/* Primary action — Give Away */}
+        {!isBorrow && !isMyItem && item.status === 'available' && (
           <Pressable style={styles.primaryBtn} onPress={handleClaim}>
             <Text style={styles.primaryBtnText}>Yoink it </Text>
             <Text style={[styles.primaryBtnText, { fontStyle: 'italic' }]}>→</Text>
           </Pressable>
         )}
 
-        {!isMyItem && item.status === 'claimed' && !isClaimedByMe && !isOnWaitlist && (
+        {!isBorrow && !isMyItem && item.status === 'claimed' && !isClaimedByMe && !isOnWaitlist && (
           <Pressable
             style={styles.primaryBtn}
             onPress={() => {
@@ -471,13 +722,13 @@ export default function ItemDetailScreen() {
           </Pressable>
         )}
 
-        {!isMyItem && isOnWaitlist && (
+        {!isBorrow && !isMyItem && isOnWaitlist && (
           <Pressable style={styles.primaryBtn} onPress={() => setShowLeaveWaitlistSheet(true)}>
             <Text style={styles.primaryBtnText}>Leave Waitlist</Text>
           </Pressable>
         )}
 
-        {!isMyItem && isClaimedByMe && item.status === 'claimed' && (
+        {!isBorrow && !isMyItem && isClaimedByMe && item.status === 'claimed' && (
           <View style={styles.btnRow}>
             <Pressable style={[styles.primaryBtn, { flex: 1 }]} onPress={handlePickedUp}>
               <Text style={styles.primaryBtnText} numberOfLines={1} adjustsFontSizeToFit>Mark Picked Up ✓</Text>
@@ -488,7 +739,7 @@ export default function ItemDetailScreen() {
           </View>
         )}
 
-        {!isMyItem && isClaimedByMe && item.status === 'pending_pickup' && (
+        {!isBorrow && !isMyItem && isClaimedByMe && item.status === 'pending_pickup' && (
           <View style={styles.btnRow}>
             <View style={[styles.doneBar, { flex: 1 }]}>
               <FontAwesome name="clock-o" size={14} color={MUTE} style={{ marginRight: 8 }} />
@@ -500,7 +751,7 @@ export default function ItemDetailScreen() {
           </View>
         )}
 
-        {isMyItem && item.status === 'pending_pickup' && (
+        {!isBorrow && isMyItem && item.status === 'pending_pickup' && (
           <View style={styles.btnRow}>
             <Pressable style={[styles.primaryBtn, { flex: 1 }]} onPress={() => confirmPickup(item.id)}>
               <Text style={styles.primaryBtnText} numberOfLines={1} adjustsFontSizeToFit>Confirm Pickup ✓</Text>
@@ -523,7 +774,7 @@ export default function ItemDetailScreen() {
         )}
 
         {/* Disposed / picked-up state */}
-        {(item.status === 'picked_up' || item.status === 'disposed') && (
+        {!isBorrow && (item.status === 'picked_up' || item.status === 'disposed') && (
           <View style={styles.doneBar}>
             <Text style={styles.doneText}>
               {item.status === 'picked_up' ? '✓ Picked up — enjoy!' : 'This item is no longer available'}
@@ -532,7 +783,7 @@ export default function ItemDetailScreen() {
         )}
 
         {/* Donor release for accidentally confirmed pickup */}
-        {isMyItem && item.status === 'picked_up' && (
+        {!isBorrow && isMyItem && item.status === 'picked_up' && (
           <Pressable style={[styles.ghostBtn, { width: '100%', marginTop: 8 }]} onPress={handleRelease}>
             <Text style={styles.ghostBtnText}>Release Claim</Text>
           </Pressable>
@@ -808,7 +1059,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   primaryBtn: {
-    width: '33%', height: 51, borderRadius: 20,
+    width: '100%', height: 51, borderRadius: 20,
     backgroundColor: TANGERINE,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     shadowColor: TANGERINE_DEEP, shadowOffset: { width: 0, height: 6 },
@@ -838,6 +1089,66 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   doneText: { fontSize: 14, color: MUTE, fontWeight: '500' },
+
+  // Borrow
+  blockedCard: {
+    backgroundColor: CREAM_2, borderRadius: 16, padding: 16, marginBottom: 12,
+  },
+  blockedCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  blockedCardTitle: { fontSize: 14, fontWeight: '700', color: INK, flex: 1 },
+  blockedAddBtn: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: '#7BA7BC',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  blockedEmpty: { fontSize: 13, color: MUTE, fontStyle: 'italic' },
+  blockedRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
+    borderTopWidth: 1, borderTopColor: 'rgba(31,26,23,0.06)',
+  },
+  blockedRowText: { fontSize: 13, color: INK, flex: 1 },
+  blockedFormLabel: { fontSize: 12, fontWeight: '700', color: MUTE, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  blockedSaveBtn: {
+    backgroundColor: '#7BA7BC', borderRadius: 999, paddingVertical: 10,
+    alignItems: 'center', marginTop: 12,
+  },
+  blockedSaveBtnText: { fontSize: 14, fontWeight: '700', color: CREAM },
+  borrowRequestsCard: {
+    backgroundColor: '#EEF5FA', borderRadius: 16, padding: 16, marginBottom: 12,
+  },
+  borrowRequestsTitle: { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 12 },
+  borrowRequestRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(31,26,23,0.06)',
+  },
+  borrowRequestInfo: { flex: 1 },
+  borrowRequestName: { fontSize: 14, fontWeight: '700', color: INK },
+  borrowRequestDates: { fontSize: 12, color: MUTE, marginTop: 2 },
+  borrowRequestActions: { flexDirection: 'row', gap: 8 },
+  approveBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: SAGE, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  approveBtnText: { fontSize: 12, fontWeight: '700', color: CREAM },
+  rejectBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: CREAM_2, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  rejectBtnText: { fontSize: 12, fontWeight: '700', color: MUTE },
+  myRequestCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: CREAM_2, borderRadius: 14, padding: 14, marginBottom: 12,
+  },
+  myRequestLabel: { fontSize: 14, fontWeight: '700', color: INK },
+  myRequestDates: { fontSize: 12, color: MUTE, marginTop: 2 },
+  borrowedCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#EEF5FA', borderRadius: 14, padding: 14, marginBottom: 12,
+  },
+  borrowedText: { fontSize: 14, color: INK, flex: 1 },
+  borrowRequestForm: { width: '100%', gap: 6 },
+  borrowFormTitle: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 4 },
+  borrowFormLabel: { fontSize: 12, fontWeight: '700', color: MUTE, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  borrowConflictText: { fontSize: 12, color: TANGERINE_DEEP, marginTop: 4 },
 
   // SMS modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },

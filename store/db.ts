@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Item, User, SearchNotification, ItemStatus } from './types';
+import type { Item, User, SearchNotification, ItemStatus, BorrowRequest, BlockedPeriod, ListingType } from './types';
 
 // ─── Row types (snake_case from Postgres) ────────────────────────────────────
 
@@ -22,6 +22,11 @@ interface ItemRow {
   claim_deadline: string | null;
   waitlist: string[];
   created_at: string;
+  listing_type: string | null;
+  borrow_requests: BorrowRequest[] | null;
+  blocked_periods: BlockedPeriod[] | null;
+  borrowed_by: string | null;
+  borrowed_until: string | null;
 }
 
 interface ProfileRow {
@@ -66,6 +71,11 @@ export function rowToItem(row: ItemRow): Item {
     claimDeadline:      row.claim_deadline ?? undefined,
     waitlist:           row.waitlist ?? [],
     createdAt:          row.created_at,
+    listingType:        (row.listing_type as ListingType) ?? 'give',
+    borrowRequests:     row.borrow_requests ?? [],
+    blockedPeriods:     row.blocked_periods ?? [],
+    borrowedBy:         row.borrowed_by ?? undefined,
+    borrowedUntil:      row.borrowed_until ?? undefined,
   };
 }
 
@@ -94,7 +104,7 @@ export async function fetchAllItems(): Promise<Item[]> {
 }
 
 export async function insertItem(
-  item: Omit<Item, 'id' | 'createdAt' | 'status' | 'claimedBy' | 'claimDeadline' | 'waitlist'>
+  item: Omit<Item, 'id' | 'createdAt' | 'status' | 'claimedBy' | 'claimDeadline' | 'waitlist' | 'borrowRequests' | 'borrowedBy' | 'borrowedUntil'>
 ): Promise<Item> {
   const { data, error } = await supabase
     .from('items')
@@ -111,6 +121,9 @@ export async function insertItem(
       disposal_method:     item.disposalMethod,
       disposal_method_note: item.disposalMethodNote ?? null,
       claim_pickup_hours:  item.claimPickupHours,
+      listing_type:        item.listingType ?? 'give',
+      borrow_requests:     [],
+      blocked_periods:     item.blockedPeriods ?? [],
     })
     .select()
     .single();
@@ -136,6 +149,10 @@ export async function updateItemFields(
     claimed_by:          string | null;
     claim_deadline:      string | null;
     waitlist:            string[];
+    borrow_requests:     BorrowRequest[];
+    blocked_periods:     BlockedPeriod[];
+    borrowed_by:         string | null;
+    borrowed_until:      string | null;
   }>
 ): Promise<Item> {
   const { data, error } = await supabase

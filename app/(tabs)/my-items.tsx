@@ -29,12 +29,13 @@ const TAB_ACTIVE: Record<string, { bg: string; text: string }> = {
   listing:    { bg: TANGERINE,  text: CREAM },
   claimed:    { bg: BUTTER,     text: INK   },
   waitlisted: { bg: ROSE,       text: CREAM },
+  lending:    { bg: STEEL_BLUE, text: CREAM },
 };
 
-type Tab = 'listing' | 'claimed' | 'waitlisted';
+type Tab = 'listing' | 'claimed' | 'waitlisted' | 'lending';
 
 export default function MyItemsScreen() {
-  const { items, getMyItems, deleteItem, markDisposed, confirmPickup, releaseClaim, getUserById, currentUser } = useApp();
+  const { items, getMyItems, deleteItem, markDisposed, confirmPickup, releaseClaim, getUserById, currentUser, approveBorrowRequest, rejectBorrowRequest, confirmBorrowReturn, markBorrowReturned } = useApp();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('listing');
 
@@ -45,10 +46,16 @@ export default function MyItemsScreen() {
   const claimedItems    = items.filter(i => i.claimedBy === currentUser.id && i.donorId !== currentUser.id && (i.status === 'claimed' || i.status === 'pending_pickup'));
   const waitlistedItems = items.filter(i => i.waitlist.includes(currentUser.id) && i.donorId !== currentUser.id);
 
+  // Lending tab: items I own that are lend-type, plus items I'm borrowing
+  const myBorrowListings = myListings.filter(i => i.listingType === 'borrow');
+  const myActiveBorrows  = items.filter(i => i.listingType === 'borrow' && i.donorId !== currentUser.id && (i.borrowedBy === currentUser.id || i.borrowRequests.some(r => r.requesterId === currentUser.id && r.status === 'pending')));
+  const lendingCount     = myBorrowListings.reduce((n, i) => n + i.borrowRequests.filter(r => r.status === 'pending').length, 0) + myActiveBorrows.length;
+
   const TABS: { key: Tab; label: string; count: number }[] = [
     { key: 'listing',    label: 'Listing',    count: myListings.length },
     { key: 'claimed',    label: 'Claimed',    count: claimedItems.length },
     { key: 'waitlisted', label: 'Waitlisted', count: waitlistedItems.length },
+    { key: 'lending',    label: 'Lending',    count: lendingCount },
   ];
 
   const handleDelete = (item: Item) => {
@@ -243,6 +250,107 @@ export default function MyItemsScreen() {
         )
       )}
 
+      {tab === 'lending' && (
+        myBorrowListings.length === 0 && myActiveBorrows.length === 0 ? (
+          <EmptyState
+            icon="refresh"
+            title="No lending activity"
+            subtitle="List an item as 'Lend Out' to share it with friends temporarily"
+          />
+        ) : (
+          <FlatList
+            data={[...myBorrowListings, ...myActiveBorrows.filter(i => !myBorrowListings.find(l => l.id === i.id))]}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const isOwner = item.donorId === currentUser.id;
+              const pendingReqs = item.borrowRequests.filter(r => r.status === 'pending');
+              const myReq = item.borrowRequests.find(r => r.requesterId === currentUser.id && (r.status === 'pending' || r.status === 'approved'));
+              return (
+                <View>
+                  <ItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
+                  <View style={styles.actionRow}>
+                    {/* Donor: pending requests */}
+                    {isOwner && pendingReqs.map(req => {
+                      const requester = getUserById(req.requesterId);
+                      return (
+                        <View key={req.id} style={styles.borrowReqRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.borrowReqName}>{requester?.name ?? 'Someone'}</Text>
+                            <Text style={styles.borrowReqDates}>
+                              {new Date(req.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {' – '}
+                              {new Date(req.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </Text>
+                          </View>
+                          <Pressable style={[styles.actionBtn, { backgroundColor: '#EEF5FA' }]} onPress={() => approveBorrowRequest(item.id, req.id)}>
+                            <FontAwesome name="check" size={13} color={STEEL_BLUE} />
+                            <Text style={[styles.actionBtnText, { color: STEEL_BLUE }]}>Approve</Text>
+                          </Pressable>
+                          <Pressable style={styles.actionBtn} onPress={() => rejectBorrowRequest(item.id, req.id)}>
+                            <FontAwesome name="times" size={13} color="#718096" />
+                            <Text style={styles.actionBtnText}>Decline</Text>
+                          </Pressable>
+                        </View>
+                      );
+                    })}
+                    {/* Donor: currently borrowed */}
+                    {isOwner && item.status === 'borrowed' && (
+                      <View style={styles.claimedByChip}>
+                        <FontAwesome name="refresh" size={11} color="#7A5C00" style={{ marginRight: 4 }} />
+                        <Text style={styles.claimedByText}>
+                          Borrowed by {getUserById(item.borrowedBy ?? '')?.name ?? 'someone'}
+                          {item.borrowedUntil ? ` until ${new Date(item.borrowedUntil + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                        </Text>
+                      </View>
+                    )}
+                    {/* Donor: pending return confirmation */}
+                    {isOwner && item.status === 'pending_return' && (
+                      <>
+                        <View style={styles.waitlistChip}>
+                          <FontAwesome name="clock-o" size={11} color="#8A3A3A" style={{ marginRight: 4 }} />
+                          <Text style={styles.waitlistChipText}>Return pending</Text>
+                        </View>
+                        <View style={{ flex: 1 }} />
+                        <Pressable style={[styles.actionBtn, styles.actionBtnConfirm]} onPress={() => confirmBorrowReturn(item.id)}>
+                          <FontAwesome name="check" size={13} color={TANGERINE} />
+                          <Text style={[styles.actionBtnText, { color: TANGERINE }]}>Confirm Return</Text>
+                        </Pressable>
+                      </>
+                    )}
+                    {/* Borrower: my request status */}
+                    {!isOwner && myReq && (
+                      <>
+                        <View style={myReq.status === 'approved' ? styles.claimedByChip : styles.waitlistChip}>
+                          <FontAwesome name={myReq.status === 'approved' ? 'check' : 'clock-o'} size={11} color={myReq.status === 'approved' ? '#7A5C00' : '#8A3A3A'} style={{ marginRight: 4 }} />
+                          <Text style={myReq.status === 'approved' ? styles.claimedByText : styles.waitlistChipText}>
+                            {myReq.status === 'approved' ? 'Approved' : 'Request pending'}
+                            {' · '}
+                            {new Date(myReq.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {' – '}
+                            {new Date(myReq.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </Text>
+                        </View>
+                        {item.status === 'borrowed' && item.borrowedBy === currentUser.id && (
+                          <>
+                            <View style={{ flex: 1 }} />
+                            <Pressable style={[styles.actionBtn, styles.actionBtnConfirm]} onPress={() => markBorrowReturned(item.id)}>
+                              <FontAwesome name="undo" size={13} color={TANGERINE} />
+                              <Text style={[styles.actionBtnText, { color: TANGERINE }]}>Mark Returned</Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </View>
+                </View>
+              );
+            }}
+          />
+        )
+      )}
+
       <Pressable style={styles.fab} onPress={() => router.push('/item/new')}>
         <FontAwesome name="plus" size={22} color="#fff" />
       </Pressable>
@@ -353,6 +461,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 40,
   },
+  borrowReqRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF5FA',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 6,
+    gap: 8,
+  },
+  borrowReqName: { fontSize: 13, fontWeight: '700', color: INK },
+  borrowReqDates: { fontSize: 12, color: MUTE },
   fab: {
     position: 'absolute',
     bottom: 24,

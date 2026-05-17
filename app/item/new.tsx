@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useApp } from '@/store/AppContext';
-import { ItemCondition, DisposalMethod, DISPOSAL_METHOD_LABELS, CONDITION_LABELS } from '@/store/types';
+import { ItemCondition, DisposalMethod, DISPOSAL_METHOD_LABELS, CONDITION_LABELS, ListingType, BlockedPeriod } from '@/store/types';
 import AddressInput from '@/components/AddressInput';
 import DatePickerInput from '@/components/DatePickerInput';
 
@@ -57,11 +57,15 @@ export default function NewItemScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const fieldOffsets = useRef<Partial<Record<FieldKey, number>>>({});
 
+  const [listingType, setListingType] = useState<ListingType>('give');
   const [photos, setPhotos] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [condition, setCondition] = useState<ItemCondition>('good');
   const [restrictions, setRestrictions] = useState('');
+  const [blockedPeriods, setBlockedPeriods] = useState<BlockedPeriod[]>([]);
+  const [blockedStart, setBlockedStart] = useState('');
+  const [blockedEnd, setBlockedEnd] = useState('');
   const [pickupLocation, setPickupLocation] = useState(currentUser.defaultAddress ?? '');
 
   // Fill in default address once profile is available (handles async profile load)
@@ -94,6 +98,14 @@ export default function NewItemScreen() {
   const removePhoto = (index: number) =>
     setPhotos(prev => prev.filter((_, i) => i !== index));
 
+  const addBlockedPeriod = () => {
+    if (!blockedStart || !blockedEnd) return;
+    if (blockedEnd < blockedStart) return;
+    setBlockedPeriods(prev => [...prev, { start: blockedStart, end: blockedEnd }]);
+    setBlockedStart('');
+    setBlockedEnd('');
+  };
+
   const handleSubmit = () => {
     const next: Errors = {};
 
@@ -103,25 +115,25 @@ export default function NewItemScreen() {
       next.pickupLocation = 'Please enter a pickup location.';
     if (!pickupWindow.trim())
       next.pickupWindow = 'Please describe when the item can be picked up.';
-    if (!disposalDate.trim())
-      next.disposalDate = 'Please choose a disposal date.';
-    else if (isNaN(new Date(disposalDate).getTime()))
-      next.disposalDate = 'That date doesn\'t look right — pick one from the calendar or type YYYY-MM-DD.';
-    const hours = parseInt(claimPickupHours, 10);
-    if (isNaN(hours) || hours < 1)
-      next.claimPickupHours = 'Please enter a pickup window of at least 1 hour.';
 
-    // Claim window must fit before the disposal deadline
-    if (!next.disposalDate && !next.claimPickupHours && disposalDate && !isNaN(hours)) {
-      const hoursUntilDisposal = (new Date(disposalDate).getTime() - Date.now()) / 3_600_000;
-      if (hours >= hoursUntilDisposal) {
-        next.claimPickupHours = `The pickup window (${hours}h) must be shorter than the time until disposal (~${Math.floor(hoursUntilDisposal)}h away). Shorten the pickup window or choose a later disposal date.`;
+    if (listingType === 'give') {
+      if (!disposalDate.trim())
+        next.disposalDate = 'Please choose a disposal date.';
+      else if (isNaN(new Date(disposalDate).getTime()))
+        next.disposalDate = 'That date doesn\'t look right — pick one from the calendar or type YYYY-MM-DD.';
+      const hours = parseInt(claimPickupHours, 10);
+      if (isNaN(hours) || hours < 1)
+        next.claimPickupHours = 'Please enter a pickup window of at least 1 hour.';
+      if (!next.disposalDate && !next.claimPickupHours && disposalDate && !isNaN(hours)) {
+        const hoursUntilDisposal = (new Date(disposalDate).getTime() - Date.now()) / 3_600_000;
+        if (hours >= hoursUntilDisposal) {
+          next.claimPickupHours = `The pickup window (${hours}h) must be shorter than the time until disposal (~${Math.floor(hoursUntilDisposal)}h away). Shorten the pickup window or choose a later disposal date.`;
+        }
       }
     }
 
     if (Object.keys(next).length > 0) {
       setErrors(next);
-      // Scroll to the first error field
       const order: FieldKey[] = ['title', 'pickupLocation', 'pickupWindow', 'disposalDate', 'claimPickupHours'];
       const firstField = order.find(f => next[f]);
       if (firstField && fieldOffsets.current[firstField] !== undefined) {
@@ -130,6 +142,7 @@ export default function NewItemScreen() {
       return;
     }
 
+    const hours = parseInt(claimPickupHours, 10);
     setSubmitting(true);
     createItem({
       title: title.trim(),
@@ -139,10 +152,12 @@ export default function NewItemScreen() {
       restrictions: restrictions.trim() || undefined,
       pickupLocation: pickupLocation.trim(),
       pickupWindow: pickupWindow.trim(),
-      disposalDate: new Date(disposalDate).toISOString(),
-      disposalMethod,
-      disposalMethodNote: disposalMethodNote.trim() || undefined,
-      claimPickupHours: hours,
+      disposalDate: listingType === 'give' ? new Date(disposalDate).toISOString() : '2099-12-31T00:00:00.000Z',
+      disposalMethod: listingType === 'give' ? disposalMethod : 'keep',
+      disposalMethodNote: listingType === 'give' ? (disposalMethodNote.trim() || undefined) : undefined,
+      claimPickupHours: listingType === 'give' ? hours : 0,
+      listingType,
+      blockedPeriods,
     });
     router.back();
   };
@@ -158,6 +173,29 @@ export default function NewItemScreen() {
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
+      {/* Listing type */}
+      <View style={styles.typeToggleSection}>
+        <Text style={styles.typeToggleLabel}>What are you doing with this item?</Text>
+        <View style={styles.typeToggleRow}>
+          <Pressable
+            style={[styles.typeBtn, listingType === 'give' && styles.typeBtnActive]}
+            onPress={() => setListingType('give')}
+          >
+            <FontAwesome name="gift" size={18} color={listingType === 'give' ? CREAM : MUTE} />
+            <Text style={[styles.typeBtnText, listingType === 'give' && styles.typeBtnTextActive]}>Give Away</Text>
+            <Text style={[styles.typeBtnSub, listingType === 'give' && { color: 'rgba(251,246,238,0.75)' }]}>Keep it forever</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.typeBtn, listingType === 'borrow' && styles.typeBtnActiveBorrow]}
+            onPress={() => setListingType('borrow')}
+          >
+            <FontAwesome name="refresh" size={18} color={listingType === 'borrow' ? CREAM : MUTE} />
+            <Text style={[styles.typeBtnText, listingType === 'borrow' && styles.typeBtnTextActive]}>Lend Out</Text>
+            <Text style={[styles.typeBtnSub, listingType === 'borrow' && { color: 'rgba(251,246,238,0.75)' }]}>Borrow & return</Text>
+          </Pressable>
+        </View>
+      </View>
+
       {/* Photos */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Photos</Text>
@@ -265,71 +303,112 @@ export default function NewItemScreen() {
         <FieldError message={errors.pickupWindow} />
       </View>
 
-      {/* Disposal Date */}
-      <View style={[styles.section, { zIndex: 20 }]} {...trackOffset('disposalDate')}>
-        <Text style={styles.label}>Disposal Date <Text style={styles.required}>*</Text></Text>
-        <Text style={styles.hint}>If no one picks up the item by this date, it will be disposed of.</Text>
-        <DatePickerInput
-          value={disposalDate}
-          onChange={d => { setDisposalDate(d); clearError('disposalDate'); }}
-        />
-        <FieldError message={errors.disposalDate} />
-      </View>
-
-      {/* Disposal Method */}
-      <View style={styles.section}>
-        <Text style={styles.label}>If unclaimed, goes to… <Text style={styles.required}>*</Text></Text>
-        <View style={styles.chipRow}>
-          {DISPOSAL_METHODS.map(m => (
-            <Pressable
-              key={m}
-              style={[styles.chip, disposalMethod === m && styles.chipActive]}
-              onPress={() => setDisposalMethod(m)}
-            >
-              <Text style={[styles.chipText, disposalMethod === m && styles.chipTextActive]}>
-                {DISPOSAL_METHOD_LABELS[m]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {disposalMethod === 'other_charity' && (
-          <TextInput
-            style={[styles.input, { marginTop: 10 }]}
-            placeholder="Specify the charity…"
-            placeholderTextColor="#a0aec0"
-            value={disposalMethodNote}
-            onChangeText={setDisposalMethodNote}
+      {/* Give Away: Disposal Date */}
+      {listingType === 'give' && (
+        <View style={[styles.section, { zIndex: 20 }]} {...trackOffset('disposalDate')}>
+          <Text style={styles.label}>Disposal Date <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.hint}>If no one picks up the item by this date, it will be disposed of.</Text>
+          <DatePickerInput
+            value={disposalDate}
+            onChange={d => { setDisposalDate(d); clearError('disposalDate'); }}
           />
-        )}
-      </View>
-
-      {/* Claim Pickup Hours */}
-      <View style={styles.section} {...trackOffset('claimPickupHours')}>
-        <Text style={styles.label}>Hours to pick up after claiming <Text style={styles.required}>*</Text></Text>
-        <Text style={styles.hint}>How long does a donee have to arrange pickup before the next person on the waitlist is asked?</Text>
-        <View style={styles.row}>
-          {['24', '48', '72', '96'].map(h => (
-            <Pressable
-              key={h}
-              style={[styles.chip, claimPickupHours === h && styles.chipActive]}
-              onPress={() => { setClaimPickupHours(h); clearError('claimPickupHours'); }}
-            >
-              <Text style={[styles.chipText, claimPickupHours === h && styles.chipTextActive]}>
-                {h}h
-              </Text>
-            </Pressable>
-          ))}
-          <TextInput
-            style={[styles.input, styles.hoursInput, errors.claimPickupHours && styles.inputError]}
-            placeholder="Custom"
-            placeholderTextColor="#a0aec0"
-            value={['24', '48', '72', '96'].includes(claimPickupHours) ? '' : claimPickupHours}
-            onChangeText={t => { setClaimPickupHours(t); clearError('claimPickupHours'); }}
-            keyboardType="numeric"
-          />
+          <FieldError message={errors.disposalDate} />
         </View>
-        <FieldError message={errors.claimPickupHours} />
-      </View>
+      )}
+
+      {/* Give Away: Disposal Method */}
+      {listingType === 'give' && (
+        <View style={styles.section}>
+          <Text style={styles.label}>If unclaimed, goes to… <Text style={styles.required}>*</Text></Text>
+          <View style={styles.chipRow}>
+            {DISPOSAL_METHODS.map(m => (
+              <Pressable
+                key={m}
+                style={[styles.chip, disposalMethod === m && styles.chipActive]}
+                onPress={() => setDisposalMethod(m)}
+              >
+                <Text style={[styles.chipText, disposalMethod === m && styles.chipTextActive]}>
+                  {DISPOSAL_METHOD_LABELS[m]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {disposalMethod === 'other_charity' && (
+            <TextInput
+              style={[styles.input, { marginTop: 10 }]}
+              placeholder="Specify the charity…"
+              placeholderTextColor="#a0aec0"
+              value={disposalMethodNote}
+              onChangeText={setDisposalMethodNote}
+            />
+          )}
+        </View>
+      )}
+
+      {/* Give Away: Claim Pickup Hours */}
+      {listingType === 'give' && (
+        <View style={styles.section} {...trackOffset('claimPickupHours')}>
+          <Text style={styles.label}>Hours to pick up after claiming <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.hint}>How long does a donee have to arrange pickup before the next person on the waitlist is asked?</Text>
+          <View style={styles.row}>
+            {['24', '48', '72', '96'].map(h => (
+              <Pressable
+                key={h}
+                style={[styles.chip, claimPickupHours === h && styles.chipActive]}
+                onPress={() => { setClaimPickupHours(h); clearError('claimPickupHours'); }}
+              >
+                <Text style={[styles.chipText, claimPickupHours === h && styles.chipTextActive]}>
+                  {h}h
+                </Text>
+              </Pressable>
+            ))}
+            <TextInput
+              style={[styles.input, styles.hoursInput, errors.claimPickupHours && styles.inputError]}
+              placeholder="Custom"
+              placeholderTextColor="#a0aec0"
+              value={['24', '48', '72', '96'].includes(claimPickupHours) ? '' : claimPickupHours}
+              onChangeText={t => { setClaimPickupHours(t); clearError('claimPickupHours'); }}
+              keyboardType="numeric"
+            />
+          </View>
+          <FieldError message={errors.claimPickupHours} />
+        </View>
+      )}
+
+      {/* Borrow: Blocked Periods */}
+      {listingType === 'borrow' && (
+        <View style={[styles.section, { zIndex: 20 }]}>
+          <Text style={styles.label}>Block Out Dates <Text style={styles.optional}>(optional)</Text></Text>
+          <Text style={styles.hint}>Add periods when this item is unavailable — e.g. vacations, scheduled use.</Text>
+          {blockedPeriods.map((p, i) => (
+            <View key={i} style={styles.blockedPeriodRow}>
+              <FontAwesome name="ban" size={12} color={MUTE} style={{ marginRight: 6 }} />
+              <Text style={styles.blockedPeriodText}>
+                {new Date(p.start + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {' – '}
+                {new Date(p.end + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </Text>
+              <Pressable onPress={() => setBlockedPeriods(prev => prev.filter((_, j) => j !== i))} style={{ marginLeft: 'auto' }}>
+                <FontAwesome name="times" size={14} color={MUTE} />
+              </Pressable>
+            </View>
+          ))}
+          <Text style={[styles.hint, { marginTop: 10 }]}>Start date</Text>
+          <DatePickerInput value={blockedStart} onChange={setBlockedStart} />
+          {blockedStart && (
+            <>
+              <Text style={[styles.hint, { marginTop: 10 }]}>End date</Text>
+              <DatePickerInput value={blockedEnd} onChange={setBlockedEnd} />
+            </>
+          )}
+          {blockedStart && blockedEnd && (
+            <Pressable style={styles.addPeriodBtn} onPress={addBlockedPeriod}>
+              <FontAwesome name="plus" size={13} color={CREAM} style={{ marginRight: 6 }} />
+              <Text style={styles.addPeriodBtnText}>Add Blocked Period</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {/* Submit */}
       <Pressable
@@ -425,6 +504,48 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: TANGERINE, borderColor: TANGERINE },
   chipText: { fontSize: 13, color: MUTE, fontWeight: '600' },
   chipTextActive: { color: CREAM },
+  typeToggleSection: {
+    backgroundColor: '#fff',
+    marginTop: 10,
+    padding: 16,
+  },
+  typeToggleLabel: { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 12 },
+  typeToggleRow: { flexDirection: 'row', gap: 10 },
+  typeBtn: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    backgroundColor: CREAM_2,
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 4,
+  },
+  typeBtnActive: { backgroundColor: TANGERINE, borderColor: TANGERINE },
+  typeBtnActiveBorrow: { backgroundColor: '#7BA7BC', borderColor: '#7BA7BC' },
+  typeBtnText: { fontSize: 14, fontWeight: '700', color: MUTE },
+  typeBtnTextActive: { color: CREAM },
+  typeBtnSub: { fontSize: 11, color: MUTE },
+  blockedPeriodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CREAM_2,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  blockedPeriodText: { fontSize: 13, color: INK, fontWeight: '600' },
+  addPeriodBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7BA7BC',
+    borderRadius: 999,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  addPeriodBtnText: { fontSize: 14, fontWeight: '700', color: CREAM },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',

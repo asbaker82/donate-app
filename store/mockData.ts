@@ -57,6 +57,9 @@ export const MOCK_ITEMS: Item[] = [
     status: 'available',
     waitlist: [],
     createdAt: d(-2),
+    listingType: 'give',
+    borrowRequests: [],
+    blockedPeriods: [],
   },
   {
     id: 'item-2',
@@ -75,6 +78,9 @@ export const MOCK_ITEMS: Item[] = [
     status: 'available',
     waitlist: [],
     createdAt: d(-1),
+    listingType: 'give',
+    borrowRequests: [],
+    blockedPeriods: [],
   },
   {
     id: 'item-3',
@@ -95,6 +101,9 @@ export const MOCK_ITEMS: Item[] = [
     claimDeadline: d(2),
     waitlist: [],
     createdAt: d(-3),
+    listingType: 'give',
+    borrowRequests: [],
+    blockedPeriods: [],
   },
   {
     id: 'item-4',
@@ -112,6 +121,9 @@ export const MOCK_ITEMS: Item[] = [
     status: 'available',
     waitlist: [],
     createdAt: d(-1),
+    listingType: 'give',
+    borrowRequests: [],
+    blockedPeriods: [],
   },
   {
     id: 'item-5',
@@ -129,5 +141,8 @@ export const MOCK_ITEMS: Item[] = [
     status: 'available',
     waitlist: ['user-1'],
     createdAt: d(-4),
+    listingType: 'give',
+    borrowRequests: [],
+    blockedPeriods: [],
   },
 ];

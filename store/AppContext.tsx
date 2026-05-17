@@ -13,7 +13,7 @@ import {
   deleteNotification as dbDeleteNotification,
   updateProfile,
 } from './db';
-import type { Item, User, SearchNotification } from './types';
+import type { Item, User, SearchNotification, BorrowRequest, BlockedPeriod } from './types';
 import { useAuth } from './AuthContext';
 
 interface AppContextType {
@@ -23,7 +23,7 @@ interface AppContextType {
   getUserById: (id: string) => User | undefined;
   getFriendItems: () => Item[];
   getMyItems: () => Item[];
-  createItem: (data: Omit<Item, 'id' | 'donorId' | 'status' | 'waitlist' | 'createdAt'>) => Promise<void>;
+  createItem: (data: Omit<Item, 'id' | 'donorId' | 'status' | 'waitlist' | 'createdAt' | 'borrowRequests' | 'borrowedBy' | 'borrowedUntil'>) => Promise<void>;
   updateItem: (id: string, updates: Partial<Item>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   claimItem: (itemId: string) => Promise<void>;
@@ -33,6 +33,14 @@ interface AppContextType {
   markPickedUp: (itemId: string) => Promise<void>;
   confirmPickup: (itemId: string) => Promise<void>;
   markDisposed: (itemId: string) => Promise<void>;
+  // Borrow flow
+  createBorrowRequest: (itemId: string, startDate: string, endDate: string) => Promise<void>;
+  approveBorrowRequest: (itemId: string, requestId: string) => Promise<void>;
+  rejectBorrowRequest: (itemId: string, requestId: string) => Promise<void>;
+  markBorrowReturned: (itemId: string) => Promise<void>;
+  confirmBorrowReturn: (itemId: string) => Promise<void>;
+  addBlockedPeriod: (itemId: string, period: BlockedPeriod) => Promise<void>;
+  removeBlockedPeriod: (itemId: string, index: number) => Promise<void>;
   // Search history (local only)
   searchHistory: string[];
   addToSearchHistory: (term: string) => void;
@@ -65,7 +73,17 @@ function itemToUpdateFields(updates: Partial<Item>) {
   if (updates.claimedBy           !== undefined) f.claimed_by          = updates.claimedBy ?? null;
   if (updates.claimDeadline       !== undefined) f.claim_deadline      = updates.claimDeadline ?? null;
   if (updates.waitlist            !== undefined) f.waitlist            = updates.waitlist;
+  if (updates.borrowRequests      !== undefined) f.borrow_requests     = updates.borrowRequests;
+  if (updates.blockedPeriods      !== undefined) f.blocked_periods     = updates.blockedPeriods;
+  if (updates.borrowedBy          !== undefined) f.borrowed_by         = updates.borrowedBy ?? null;
+  if (updates.borrowedUntil       !== undefined) f.borrowed_until      = updates.borrowedUntil ?? null;
   return f as Parameters<typeof updateItemFields>[1];
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function datesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart <= bEnd && aEnd >= bStart;
 }
 
 // ─── Provider ────────────────────────────────────────────────────────────────
@@ -156,7 +174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Mutations ──────────────────────────────────────────────────────────────
 
   const createItemMutation = useMutation({
-    mutationFn: (data: Omit<Item, 'id' | 'donorId' | 'status' | 'waitlist' | 'createdAt'>) =>
+    mutationFn: (data: Omit<Item, 'id' | 'donorId' | 'status' | 'waitlist' | 'createdAt' | 'borrowRequests' | 'borrowedBy' | 'borrowedUntil'>) =>
       insertItem({ ...data, donorId: currentUser.id }),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.items }),
   });
@@ -333,6 +351,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     onSettled: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.items }),
   });
 
+  // ── Borrow mutations ───────────────────────────────────────────────────────
+
+  const borrowRequestMutation = useMutation({
+    mutationFn: ({ itemId, requests }: { itemId: string; requests: BorrowRequest[] }) =>
+      updateItemFields(itemId, { borrow_requests: requests }),
+    onMutate: async ({ itemId, requests }) => {
+      await qc.cancelQueries({ queryKey: QUERY_KEYS.items });
+      const snapshot = qc.getQueryData<Item[]>(QUERY_KEYS.items);
+      optimisticItemUpdate(itemId, { borrowRequests: requests });
+      return { snapshot };
+    },
+    onError: (_e, _v, ctx) => { if (ctx?.snapshot) qc.setQueryData(QUERY_KEYS.items, ctx.snapshot); },
+    onSettled: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.items }),
+  });
+
+  const blockedPeriodMutation = useMutation({
+    mutationFn: ({ itemId, periods }: { itemId: string; periods: BlockedPeriod[] }) =>
+      updateItemFields(itemId, { blocked_periods: periods }),
+    onMutate: async ({ itemId, periods }) => {
+      await qc.cancelQueries({ queryKey: QUERY_KEYS.items });
+      const snapshot = qc.getQueryData<Item[]>(QUERY_KEYS.items);
+      optimisticItemUpdate(itemId, { blockedPeriods: periods });
+      return { snapshot };
+    },
+    onError: (_e, _v, ctx) => { if (ctx?.snapshot) qc.setQueryData(QUERY_KEYS.items, ctx.snapshot); },
+    onSettled: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.items }),
+  });
+
   // ── Derived helpers ────────────────────────────────────────────────────────
 
   const getUserById = (id: string) =>
@@ -341,7 +387,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const getFriendItems = (): Item[] => {
     const myFriendIds = new Set(currentUser.friends);
     return items.filter(item => {
-      if (item.status === 'picked_up' || item.status === 'disposed') return false;
+      // Give items: hide once picked up / disposed. Borrow items: hide only when returned (picked_up maps to returned)
+      if (item.listingType === 'give' && (item.status === 'picked_up' || item.status === 'disposed')) return false;
+      if (item.listingType === 'borrow' && item.status === 'picked_up') return false;
       if (!myFriendIds.has(item.donorId)) return false;
       const donor = getUserById(item.donorId);
       if (!donor) return false;
@@ -420,7 +468,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getUserById,
         getFriendItems,
         getMyItems,
-        createItem:  async (data) => { await createItemMutation.mutateAsync(data); },
+        createItem:  async (data) => { await createItemMutation.mutateAsync(data as Parameters<typeof createItemMutation.mutateAsync>[0]); },
         updateItem:  async (id, updates) => { await updateItemMutation.mutateAsync({ id, updates }); },
         deleteItem:  async (id) => { await deleteItemMutation.mutateAsync(id); },
         claimItem: async (id) => {
@@ -457,6 +505,81 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         markPickedUp:   async (id) => { await markPickedUpMutation.mutateAsync(id); },
         confirmPickup:  async (id) => { await confirmPickupMutation.mutateAsync(id); },
         markDisposed:   async (id) => { await markDisposedMutation.mutateAsync(id); },
+        createBorrowRequest: async (itemId, startDate, endDate) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          const newReq: BorrowRequest = {
+            id: `${Date.now()}_${currentUser.id}`,
+            requesterId: currentUser.id,
+            startDate,
+            endDate,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+          };
+          await borrowRequestMutation.mutateAsync({ itemId, requests: [...item.borrowRequests, newReq] });
+        },
+        approveBorrowRequest: async (itemId, requestId) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          const req = item.borrowRequests.find(r => r.id === requestId);
+          if (!req) return;
+          const updatedRequests = item.borrowRequests.map(r =>
+            r.id === requestId ? { ...r, status: 'approved' as const } :
+            // Auto-reject others with overlapping dates
+            (r.status === 'pending' && datesOverlap(r.startDate, r.endDate, req.startDate, req.endDate))
+              ? { ...r, status: 'rejected' as const }
+              : r
+          );
+          await updateItemFields(itemId, {
+            borrow_requests: updatedRequests,
+            status: 'borrowed',
+            borrowed_by: req.requesterId,
+            borrowed_until: req.endDate,
+          });
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.items });
+        },
+        rejectBorrowRequest: async (itemId, requestId) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          const updatedRequests = item.borrowRequests.map(r =>
+            r.id === requestId ? { ...r, status: 'rejected' as const } : r
+          );
+          await borrowRequestMutation.mutateAsync({ itemId, requests: updatedRequests });
+        },
+        markBorrowReturned: async (itemId) => {
+          await updateItemFields(itemId, { status: 'pending_return' });
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.items });
+        },
+        confirmBorrowReturn: async (itemId) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          const updatedRequests = item.borrowRequests.map(r =>
+            r.status === 'approved' ? { ...r, status: 'returned' as const } : r
+          );
+          await updateItemFields(itemId, {
+            status: 'available',
+            borrow_requests: updatedRequests,
+            borrowed_by: null,
+            borrowed_until: null,
+          });
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.items });
+        },
+        addBlockedPeriod: async (itemId, period) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          await blockedPeriodMutation.mutateAsync({ itemId, periods: [...item.blockedPeriods, period] });
+        },
+        removeBlockedPeriod: async (itemId, index) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          await blockedPeriodMutation.mutateAsync({ itemId, periods: item.blockedPeriods.filter((_, i) => i !== index) });
+        },
         searchHistory,
         addToSearchHistory,
         clearSearchHistory,

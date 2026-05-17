@@ -81,7 +81,20 @@ Path alias `@/` maps to the repo root.
 - **Claim flow**: `available → claimed` (sets `claimDeadline = now + claimPickupHours * 3600000`). Deadline passes → `processExpiredClaims` promotes next waiter or resets to `available`.
 - **Item lifecycle**: `available → claimed → pending_pickup → picked_up` (happy path) or any state `→ disposed`. The `pending_pickup` step is a two-party confirmation: donee calls `markPickedUp` (sets `pending_pickup`), donor calls `confirmPickup` (sets `picked_up`). Either party can call `releaseClaim` to revert.
 - **Validation**: When creating or editing a listing, `claimPickupHours` must be less than the hours remaining until `disposalDate` — enforced in both `new.tsx` and `edit/[id].tsx`.
-- **Supabase constraint**: The `items.status` check constraint must include `'pending_pickup'`. If adding this status to a live DB, run: `ALTER TABLE public.items DROP CONSTRAINT items_status_check; ALTER TABLE public.items ADD CONSTRAINT items_status_check CHECK (status IN ('available','claimed','pending_pickup','picked_up','disposed'));`
+- **Supabase constraint**: The `items.status` check constraint must include `'pending_pickup'`, `'borrowed'`, and `'pending_return'`. Migration for a live DB:
+  ```sql
+  ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_status_check;
+  ALTER TABLE public.items ADD CONSTRAINT items_status_check
+    CHECK (status IN ('available','claimed','pending_pickup','picked_up','disposed','borrowed','pending_return'));
+  ALTER TABLE public.items
+    ADD COLUMN IF NOT EXISTS listing_type text NOT NULL DEFAULT 'give',
+    ADD COLUMN IF NOT EXISTS borrow_requests jsonb NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS blocked_periods jsonb NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS borrowed_by text,
+    ADD COLUMN IF NOT EXISTS borrowed_until timestamptz;
+  ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_listing_type_check;
+  ALTER TABLE public.items ADD CONSTRAINT items_listing_type_check CHECK (listing_type IN ('give','borrow'));
+  ```
 
 ### Sounds — `utils/sounds.ts`
 - `playClaimSound()` — celebratory C5→E5→G5 arpeggio on web via `AudioContext`; native builds a WAV buffer in memory and plays it via `expo-av` + `expo-file-system` (no bundled audio files).
