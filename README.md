@@ -79,7 +79,7 @@ app/
   edit-profile.tsx
 components/        ItemCard, DatePickerInput, AddressInput, ImageLightbox,
                    CustomTabBar, ProfileHeaderButton, ClaimToast, WaitlistToast,
-                   ConfirmSheet, ClaimCelebration
+                   ConfirmSheet, ClaimCelebration, ImageCropModal (web-only)
 store/
   AuthContext.tsx  Auth state + AsyncStorage persistence
   AppContext.tsx   All app state and mutations
@@ -87,6 +87,7 @@ store/
   mockData.ts      Seed users and items
 utils/
   geocode.ts       Nominatim geocoding + Haversine distance
+  sounds.ts        Claim / waitlist sounds (AudioContext on web, expo-av WAV on native)
 ```
 
 See [CLAUDE.md](CLAUDE.md) for architecture details.

@@ -67,7 +67,7 @@ export default function MyItemsScreen() {
       <View style={styles.actionRow}>
         {item.claimedBy && (
           <View style={styles.claimedByChip}>
-            <FontAwesome name="user" size={11} color="#10B981" style={{ marginRight: 4 }} />
+            <FontAwesome name="user" size={11} color="#F26B3A" style={{ marginRight: 4 }} />
             <Text style={styles.claimedByText}>
               Claimed by {getUserById(item.claimedBy)?.name ?? 'someone'}
             </Text>
@@ -214,7 +214,7 @@ function EmptyState({ icon, title, subtitle }: { icon: React.ComponentProps<type
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1, backgroundColor: '#FBF6EE' },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   filterRow: { flexDirection: 'row', gap: 8 },
   filterBtn: {
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#e2e8f0',
   },
-  filterBtnActive: { backgroundColor: '#10B981' },
+  filterBtnActive: { backgroundColor: '#F26B3A' },
   filterBtnText: { fontSize: 13, color: '#4a5568', fontWeight: '600' },
   filterBtnTextActive: { color: '#fff' },
   sectionHeader: {
@@ -259,12 +259,12 @@ const styles = StyleSheet.create({
   claimedByChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#FFF3EC',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  claimedByText: { fontSize: 12, color: '#10B981', fontWeight: '600' },
+  claimedByText: { fontSize: 12, color: '#F26B3A', fontWeight: '600' },
   waitlistChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#10B981',
+    backgroundColor: '#F26B3A',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

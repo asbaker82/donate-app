@@ -254,7 +254,7 @@ export default function BrowseScreen() {
             <FontAwesome
               name="bell"
               size={15}
-              color={searchNotifications.some(n => n.keyword.toLowerCase() === search.trim().toLowerCase()) ? '#fff' : '#10B981'}
+              color={searchNotifications.some(n => n.keyword.toLowerCase() === search.trim().toLowerCase()) ? '#FBF6EE' : '#F26B3A'}
             />
           </Pressable>
         )}
@@ -304,7 +304,7 @@ export default function BrowseScreen() {
       {/* Distance filter chips — only shown when user has a default address */}
       {currentUser.defaultAddress ? (
         <View style={styles.filterRow}>
-          <FontAwesome name="location-arrow" size={12} color="#3182ce" style={{ marginRight: 2 }} />
+          <FontAwesome name="location-arrow" size={12} color="#847A70" style={{ marginRight: 2 }} />
           {([null, 5, 10, 25, 50] as (number | null)[]).map(miles => (
             <Pressable
               key={miles ?? 'any'}
@@ -348,7 +348,7 @@ export default function BrowseScreen() {
           )}
           {search.trim().length > 0 && (
             <Pressable style={styles.emptyAlertBtn} onPress={handleSetAlert}>
-              <FontAwesome name="bell" size={14} color="#10B981" style={{ marginRight: 6 }} />
+              <FontAwesome name="bell" size={14} color="#D8531F" style={{ marginRight: 6 }} />
               <Text style={styles.emptyAlertBtnText}>Set Alert for "{search.trim()}"</Text>
             </Pressable>
           )}
@@ -369,15 +369,15 @@ export default function BrowseScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1, backgroundColor: '#FBF6EE' },
   banner: {
-    backgroundColor: '#059669',
+    backgroundColor: '#F26B3A',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  bannerText: { flex: 1, color: '#fff', fontWeight: '600', fontSize: 14 },
+  bannerText: { flex: 1, color: '#FBF6EE', fontWeight: '600', fontSize: 14 },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,31 +391,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    shadowColor: '#000',
+    paddingVertical: 9,
+    shadowColor: '#1F1A17',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.07,
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  searchBoxOpen: { borderColor: '#10B981', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
-  searchInput: { flex: 1, fontSize: 15, color: '#2d3748' },
+  searchBoxOpen: { borderColor: '#F26B3A', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  searchInput: { flex: 1, fontSize: 15, color: '#1F1A17' },
   searchAction: { padding: 2 },
   alertBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#ECFDF5',
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#FFF3EC',
     borderWidth: 1.5,
-    borderColor: '#10B981',
+    borderColor: '#F26B3A',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  alertBtnActive: { backgroundColor: '#10B981' },
+  alertBtnActive: { backgroundColor: '#F26B3A' },
 
   // History dropdown
   historyDropdown: {
@@ -423,10 +423,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderTopWidth: 0,
-    borderColor: '#10B981',
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    shadowColor: '#000',
+    borderColor: '#F26B3A',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    shadowColor: '#1F1A17',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 6,
   },
-  historyTitle: { fontSize: 11, fontWeight: '700', color: '#a0aec0', textTransform: 'uppercase', letterSpacing: 0.4 },
+  historyTitle: { fontSize: 11, fontWeight: '700', color: '#847A70', textTransform: 'uppercase', letterSpacing: 0.4 },
   historyClear: { fontSize: 12, color: '#e53e3e', fontWeight: '600' },
   historyRow: {
     flexDirection: 'row',
@@ -449,11 +449,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'rgba(31,26,23,0.06)',
     gap: 10,
   },
   historyIcon: { width: 16 },
-  historyTerm: { flex: 1, fontSize: 14, color: '#2d3748' },
+  historyTerm: { flex: 1, fontSize: 14, color: '#1F1A17' },
 
   filterRow: {
     flexDirection: 'row',
@@ -463,19 +463,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    backgroundColor: '#F4ECDD',
   },
-  filterBtnActive: { backgroundColor: '#10B981' },
-  filterBtnText: { fontSize: 13, color: '#4a5568', fontWeight: '600' },
-  filterBtnTextActive: { color: '#fff' },
-  matchCount: { fontSize: 12, color: '#a0aec0', marginLeft: 'auto' },
-  distanceBtn: { backgroundColor: '#ebf8ff', borderWidth: 1, borderColor: '#bee3f8' },
-  distanceBtnActive: { backgroundColor: '#3182ce', borderColor: '#3182ce' },
-  distanceBtnText: { color: '#3182ce' },
-  distanceBtnTextActive: { color: '#fff' },
+  filterBtnActive: { backgroundColor: '#F26B3A' },
+  filterBtnText: { fontSize: 13, color: '#847A70', fontWeight: '600' },
+  filterBtnTextActive: { color: '#FBF6EE' },
+  matchCount: { fontSize: 12, color: '#847A70', marginLeft: 'auto' },
+  distanceBtn: { backgroundColor: '#F4ECDD', borderWidth: 1, borderColor: 'rgba(31,26,23,0.1)' },
+  distanceBtnActive: { backgroundColor: '#1F1A17', borderColor: '#1F1A17' },
+  distanceBtnText: { color: '#847A70' },
+  distanceBtnTextActive: { color: '#FBF6EE' },
 
   empty: {
     flex: 1,
@@ -485,28 +485,28 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     gap: 8,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#a0aec0', marginTop: 16 },
-  emptySubtitle: { fontSize: 14, color: '#cbd5e0', textAlign: 'center' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#B0A89E', marginTop: 16 },
+  emptySubtitle: { fontSize: 14, color: '#C9BCA8', textAlign: 'center' },
   emptyAddFriendsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
-    backgroundColor: '#10B981',
-    borderRadius: 20,
+    backgroundColor: '#F26B3A',
+    borderRadius: 999,
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
-  emptyAddFriendsBtnText: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  emptyAddFriendsBtnText: { fontSize: 14, color: '#FBF6EE', fontWeight: '700' },
   emptyAlertBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 20,
+    backgroundColor: '#FFF3EC',
+    borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: '#10B981',
+    borderColor: '#F26B3A',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  emptyAlertBtnText: { fontSize: 13, color: '#10B981', fontWeight: '600' },
+  emptyAlertBtnText: { fontSize: 13, color: '#D8531F', fontWeight: '600' },
 });

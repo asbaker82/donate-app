@@ -81,6 +81,11 @@ Path alias `@/` maps to the repo root.
 - **Item lifecycle**: `available → claimed → picked_up` (happy path) or any state `→ disposed`.
 - **Validation**: When creating or editing a listing, `claimPickupHours` must be less than the hours remaining until `disposalDate` — enforced in both `new.tsx` and `edit/[id].tsx`.
 
+### Sounds — `utils/sounds.ts`
+- `playClaimSound()` — celebratory C5→E5→G5 arpeggio on web via `AudioContext`; native builds a WAV buffer in memory and plays it via `expo-av` + `expo-file-system` (no bundled audio files).
+- `playWaitlistSound()` — softer two-note ascending boop, same dual-path approach.
+- Both fail silently so animations still run if audio is blocked.
+
 ### Distance — `utils/geocode.ts`
 - `geocodeAddress(address)` calls Nominatim (OpenStreetMap, no API key). Module-level `Map` cache prevents duplicate calls. Rate-limit: 1100 ms delay between requests.
 - `haversineMiles(a, b)` computes driving-distance proxy in miles.
@@ -107,6 +112,7 @@ Path alias `@/` maps to the repo root.
 | `WaitlistToast` | Slide-up toast after joining waitlist. |
 | `ConfirmSheet` | Slide-up confirmation sheet (replaces `Alert` for release-claim flow). |
 | `ClaimCelebration` | Full-screen confetti (legacy, still present but replaced by ClaimToast in main flow). |
+| `ImageCropModal` | **Web-only** circular crop modal. Injects a `<canvas>` imperatively into a `View` DOM node (RN refs give back the underlying DOM element on web). Drag to pan, scroll/buttons to zoom. Used in `edit-profile.tsx` after image pick. |
 
 Both toast components use core RN `Animated` (not Reanimated) with `useNativeDriver: true`.
 
@@ -119,5 +125,24 @@ Both toast components use core RN `Animated` (not Reanimated) with `useNativeDri
 
 Do not loosen thresholds without testing "can opener" does not return car seats.
 
+### Leftover Expo boilerplate
+These files are unused template artifacts — do not reference or import from them:
+`app/(tabs)/two.tsx`, `app/modal.tsx`, `components/EditScreenInfo.tsx`, `components/ExternalLink.tsx`, `components/StyledText.tsx`, `components/Themed.tsx`
+
 ### Styling
-No shared theme file. Brand color `#10B981` (emerald-500). All headers are white (`#fff`) with dark `#111827` text. All styles use `StyleSheet.create` inline per file. The RN-web `boxShadow` deprecation warning is harmless.
+No shared theme file. All styles use `StyleSheet.create` inline per file. The RN-web `boxShadow` deprecation warning is harmless.
+
+Brand tokens (defined as file-level consts in each file that needs them — no shared theme import):
+| Token | Hex | Role |
+|---|---|---|
+| Tangerine | `#F26B3A` | Primary CTAs, active chips, badges |
+| Tangerine Deep | `#D8531F` | Alert text, shadows, pressed states |
+| Cream | `#FBF6EE` | Screen backgrounds, button text on dark |
+| Cream 2 | `#F4ECDD` | Card backgrounds, secondary surfaces |
+| Ink | `#1F1A17` | Primary text |
+| Ink 2 | `#3A332E` | Secondary text |
+| Mute | `#847A70` | Placeholder / label text |
+| Sage | `#7FA88A` | Pickup pin, "picked up" badge |
+| Butter | `#F4C95D` | "Claimed" badge background |
+
+All headers are white (`#fff`) with dark Ink text.

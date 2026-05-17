@@ -15,7 +15,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
         const route = state.routes.find(r => r.name === tab.name);
         if (!route) return null;
         const focused = state.index === state.routes.indexOf(route);
-        const color = focused ? '#10B981' : '#a0aec0';
+        const color = focused ? '#F26B3A' : '#B0A89E';
 
         return (
           <Pressable
@@ -37,9 +37,9 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#FBF6EE',
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: 'rgba(31,26,23,0.08)',
     paddingTop: 8,
     paddingBottom: Platform.OS === 'web' ? 12 : 20,
     minHeight: 60,

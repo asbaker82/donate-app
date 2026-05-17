@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Item, CONDITION_LABELS, CONDITION_COLORS } from '@/store/types';
+import { Item, CONDITION_LABELS } from '@/store/types';
 import { useApp } from '@/store/AppContext';
 
 interface Props {
@@ -27,7 +27,7 @@ export default function ItemCard({ item, onPress, distance }: Props) {
           <Image source={{ uri: item.photos[0] }} style={styles.photo} resizeMode="contain" />
         ) : (
           <View style={styles.photoPlaceholder}>
-            <FontAwesome name="image" size={36} color="#cbd5e0" />
+            <FontAwesome name="image" size={36} color="#C9BCA8" />
           </View>
         )}
         <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -41,7 +41,7 @@ export default function ItemCard({ item, onPress, distance }: Props) {
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.donor}>from {donor?.name ?? 'Unknown'}</Text>
 
-        <View style={[styles.conditionBadge, { backgroundColor: CONDITION_COLORS[item.condition] }]}>
+        <View style={styles.conditionBadge}>
           <Text style={styles.conditionText}>{CONDITION_LABELS[item.condition]}</Text>
         </View>
 
@@ -90,77 +90,89 @@ export default function ItemCard({ item, onPress, distance }: Props) {
   );
 }
 
+// Brand tokens
+const TANGERINE      = '#F26B3A';
+const TANGERINE_DEEP = '#D8531F';
+const CREAM          = '#FBF6EE';
+const CREAM_2        = '#F4ECDD';
+const INK            = '#1F1A17';
+const MUTE           = '#847A70';
+const SAGE           = '#7FA88A';
+
 const STATUS_LABELS: Record<string, string> = {
-  available: 'Available',
-  claimed: 'Claimed',
+  available: 'Free',
+  claimed:   'Claimed',
   picked_up: 'Picked Up',
-  disposed: 'Disposed',
+  disposed:  'Gone',
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  available: { bg: '#D1FAE5', text: '#047857' },
-  claimed: { bg: '#fefcbf', text: '#744210' },
-  picked_up: { bg: '#bee3f8', text: '#2a4365' },
-  disposed: { bg: '#e2e8f0', text: '#4a5568' },
+  available: { bg: TANGERINE,  text: CREAM },
+  claimed:   { bg: '#F4C95D',  text: INK   },
+  picked_up: { bg: SAGE,       text: CREAM },
+  disposed:  { bg: '#B0A89E',  text: CREAM },
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: CREAM,
+    borderRadius: 16,
     marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
+    marginVertical: 7,
+    shadowColor: INK,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
     elevation: 3,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(31,26,23,0.07)',
   },
-  cardPressed: { opacity: 0.92 },
+  cardPressed: { opacity: 0.90 },
   photoArea: {
     height: 160,
     position: 'relative',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: CREAM_2,
   },
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f7fafc',
+    backgroundColor: CREAM_2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   statusBadge: {
     position: 'absolute',
     top: 10,
-    right: 10,
+    left: 10,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  statusText: { fontSize: 12, fontWeight: '700' },
+  statusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   body: { padding: 14 },
-  title: { fontSize: 16, fontWeight: '700', color: '#2d3748', marginBottom: 2 },
-  donor: { fontSize: 13, color: '#718096', marginBottom: 8 },
+  title: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 2, letterSpacing: -0.2 },
+  donor: { fontSize: 13, color: MUTE, marginBottom: 8 },
   conditionBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 8,
     marginBottom: 8,
+    backgroundColor: CREAM_2,
   },
-  conditionText: { fontSize: 12, fontWeight: '600', color: '#2d3748' },
+  conditionText: { fontSize: 12, fontWeight: '600', color: INK },
   restrictionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fffaf0',
-    borderRadius: 6,
+    backgroundColor: '#FFF3EC',
+    borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginBottom: 8,
   },
-  restrictionText: { fontSize: 12, color: '#c05621', flex: 1 },
+  restrictionText: { fontSize: 12, color: TANGERINE_DEEP, flex: 1 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -168,27 +180,27 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   footerItem: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
-  footerText: { fontSize: 12, color: '#718096', flex: 1 },
+  footerText: { fontSize: 12, color: MUTE, flex: 1 },
   footerRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   distanceChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ebf8ff',
+    backgroundColor: CREAM_2,
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  distanceText: { fontSize: 11, color: '#3182ce', fontWeight: '600' },
+  distanceText: { fontSize: 11, color: INK, fontWeight: '600' },
   timeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#edf2f7',
+    backgroundColor: CREAM_2,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  timeChipUrgent: { backgroundColor: '#fff5f5' },
-  timeText: { fontSize: 12, color: '#718096', fontWeight: '600' },
-  timeTextUrgent: { color: '#c53030' },
-  waitlistText: { fontSize: 12, color: '#10B981', marginTop: 6, fontWeight: '600' },
+  timeChipUrgent: { backgroundColor: '#FFF3EC' },
+  timeText: { fontSize: 12, color: MUTE, fontWeight: '600' },
+  timeTextUrgent: { color: '#C53030' },
+  waitlistText: { fontSize: 12, color: TANGERINE_DEEP, marginTop: 6, fontWeight: '600' },
 });
