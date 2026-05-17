@@ -35,21 +35,21 @@ export default function ProfileHeaderButton() {
 const styles = StyleSheet.create({
   btn: { marginRight: 14 },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#F26B3A',
   },
   fallback: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FFF3EC',
     borderWidth: 2,
     borderColor: '#F26B3A',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { fontSize: 13, fontWeight: '800', color: '#F26B3A' },
+  initials: { fontSize: 15, fontWeight: '800', color: '#F26B3A' },
 });

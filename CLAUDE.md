@@ -94,6 +94,9 @@ Path alias `@/` maps to the repo root.
 - Browse screen geocodes user's `defaultAddress` + each visible item's `pickupLocation`, then filters by `maxMiles` chip selection. Distance filter chips (≤5, 10, 25, 50 mi, Any) are always visible; if the user has no `defaultAddress` set, a prompt to set one is shown instead of distances.
 - Item detail screen computes and displays distance in the Pickup Details card.
 
+### Photo grids
+Photo grids in `item/new.tsx`, `item/edit/[id].tsx`, and the thumbnail strip in `item/[id].tsx` use `flexDirection: 'row', flexWrap: 'wrap', gap: 10` — **not** a horizontal `ScrollView`. The delete (×) button on each photo thumbnail is `position: 'absolute', top: 4, right: 4` so it stays inside the photo bounds, not floating outside.
+
 ### Platform differences
 - `Alert.alert` callbacks don't fire on web — use `window.confirm()` / `window.alert()` on `Platform.OS === 'web'` with `Alert.alert` fallback for native. Follow this pattern for every destructive or confirmatory action.
 - `Modal` must **never** be nested inside `ScrollView` on web — silently breaks rendering. Place `Modal` as a sibling of `ScrollView` inside a wrapping `View`.
@@ -106,7 +109,7 @@ Path alias `@/` maps to the repo root.
 |---|---|
 | `HeaderLogo` | Speed-wordmark logo used as `headerTitle` on all screens. Accepts `size` prop (default 22). Uses `BricolageGrotesque_800ExtraBold` font. Three horizontal speed bars rendered via flow layout (not absolute positioning) for reliable header rendering. |
 | `CustomTabBar` | Custom bottom tab bar (Browse + My Items only) |
-| `ProfileHeaderButton` | Avatar/initials button in header right → profile screen |
+| `ProfileHeaderButton` | Avatar/initials button (40×40) in header right → profile screen |
 | `ItemCard` | Card used in Browse, My Items, and items-list. Accepts optional `distance` prop. |
 | `AddressInput` | Nominatim autocomplete. Wrapping `View` needs `zIndex: 10` to float above siblings. |
 | `DatePickerInput` | Custom calendar. Fixed width `276px` — never stretch. Past dates disabled. |
@@ -150,6 +153,6 @@ Brand tokens (defined as file-level consts in each file that needs them — no s
 
 **All screen backgrounds** use Cream (`#FBF6EE`) — auth screens, tab screens, and stack screens alike. Do not use `#fff` as a screen background.
 
-**Tab headers** (Browse, My Items, Profile) use `backgroundColor: '#FBF6EE'` (Cream) with `headerShadowVisible: false` so the header blends into the page. **Stack headers** (item detail, modals, edit screens) keep the default white (`#fff`) from React Navigation. All headers use `HeaderLogo` as `headerTitle` — do not use plain string titles.
+**Tab headers** (Browse, My Items, Profile) use `backgroundColor: '#FBF6EE'` (Cream) with `headerShadowVisible: false` so the header blends into the page. **Stack headers** (item detail, modals, edit screens) keep the default white (`#fff`) from React Navigation. All headers use `HeaderLogo` as `headerTitle` — do not use plain string titles. All headers use `headerTitleAlign: 'center'`.
 
 **Cards and surfaces** within a screen use Cream 2 (`#F4ECDD`) to lift above the Cream background. Destructive actions use Tangerine Deep (`#D8531F`), never `#e53e3e` or other reds.

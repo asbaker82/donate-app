@@ -87,6 +87,7 @@ function RootLayoutNav() {
           headerStyle: { backgroundColor: '#fff' },
           headerTintColor: '#111827',
           headerTitleStyle: { fontWeight: '700', color: '#111827' },
+          headerTitleAlign: 'center',
           headerShadowVisible: true,
         }}
       >

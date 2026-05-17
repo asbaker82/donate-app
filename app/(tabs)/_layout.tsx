@@ -16,7 +16,7 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: '#FBF6EE' },
         headerTintColor: '#1F1A17',
         headerTitleStyle: { fontWeight: '700', color: '#1F1A17' },
-        headerTitleAlign: 'left',
+        headerTitleAlign: 'center',
         headerShadowVisible: false,
       }}
     >

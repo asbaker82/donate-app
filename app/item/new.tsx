@@ -161,7 +161,7 @@ export default function NewItemScreen() {
       {/* Photos */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Photos</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
+        <View style={styles.photoRow}>
           {photos.map((uri, i) => (
             <View key={i} style={styles.photoThumb}>
               <Image source={{ uri }} style={styles.photoImg} />
@@ -178,7 +178,7 @@ export default function NewItemScreen() {
               </Text>
             </Pressable>
           )}
-        </ScrollView>
+        </View>
         <Text style={styles.hint}>Up to 6 photos</Text>
       </View>
 
@@ -390,13 +390,13 @@ const styles = StyleSheet.create({
   },
   textArea: { minHeight: 100, paddingTop: 10 },
   hoursInput: { flex: 1, minWidth: 70 },
-  photoRow: { flexDirection: 'row', marginBottom: 4 },
-  photoThumb: { position: 'relative', marginRight: 10 },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  photoThumb: { position: 'relative' },
   photoImg: { width: 90, height: 90, borderRadius: 10 },
   removePhoto: {
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: 4,
+    right: 4,
     backgroundColor: '#fff',
     borderRadius: 10,
   },

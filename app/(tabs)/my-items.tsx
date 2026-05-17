@@ -16,6 +16,8 @@ import { Item, DISPOSAL_METHOD_LABELS } from '@/store/types';
 import ItemCard from '@/components/ItemCard';
 
 const TANGERINE = '#F26B3A';
+const TANG_DEEP = '#D8531F';
+const CREAM_2   = '#F4ECDD';
 const BUTTER    = '#F4C95D';
 const ROSE      = '#E89A8D';
 const CREAM     = '#FBF6EE';
@@ -121,8 +123,8 @@ export default function MyItemsScreen() {
               <Text style={styles.actionBtnText}>Dispose</Text>
             </Pressable>
             <Pressable style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => handleDelete(item)}>
-              <FontAwesome name="trash" size={14} color="#e53e3e" />
-              <Text style={[styles.actionBtnText, { color: '#e53e3e' }]}>Remove</Text>
+              <FontAwesome name="trash" size={14} color={TANG_DEEP} />
+              <Text style={[styles.actionBtnText, { color: TANG_DEEP }]}>Remove</Text>
             </Pressable>
           </>
         )}
@@ -326,9 +328,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     gap: 4,
   },
-  actionBtnDanger: { backgroundColor: '#fff5f5' },
-  actionBtnConfirm: { backgroundColor: '#FFF3EC' },
-  actionBtnText: { fontSize: 12, color: '#718096', fontWeight: '600' },
+  actionBtnDanger: { backgroundColor: CREAM_2 },
+  actionBtnConfirm: { backgroundColor: CREAM_2 },
+  actionBtnText: { fontSize: 12, color: MUTE, fontWeight: '600' },
   positionRow: {
     flexDirection: 'row',
     alignItems: 'center',

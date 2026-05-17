@@ -263,7 +263,7 @@ export default function ItemDetailScreen() {
 
         {/* Thumbnail strip — outside heroContainer so badges don't overlap it */}
         {item.photos.length > 1 && (
-          <ScrollView horizontal style={styles.thumbStrip} showsHorizontalScrollIndicator={false}>
+          <View style={styles.thumbStrip}>
             {item.photos.map((uri, i) => (
               <Pressable key={i} onPress={() => setPhotoIndex(i)}>
                 <Image
@@ -273,7 +273,7 @@ export default function ItemDetailScreen() {
                 />
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
         )}
 
         {/* ── Content sheet ─────────────────────────────────── */}
@@ -687,9 +687,9 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(31,26,23,0.3)' },
   dotActive: { width: 16, backgroundColor: INK },
 
-  thumbStrip: { paddingHorizontal: 16, paddingVertical: 10 },
+  thumbStrip: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   thumb: {
-    width: 60, height: 60, borderRadius: 10, marginRight: 8,
+    width: 60, height: 60, borderRadius: 10,
     borderWidth: 2, borderColor: 'transparent',
   },
   thumbActive: { borderColor: TANGERINE },
@@ -829,10 +829,10 @@ const styles = StyleSheet.create({
   ghostBtnText: { fontSize: 15, fontWeight: '600', color: MUTE },
   dangerBtn: {
     height: 54, paddingHorizontal: 20, borderRadius: 16,
-    backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FC8181',
+    backgroundColor: CREAM_2, borderWidth: 1, borderColor: TANGERINE_DEEP,
     alignItems: 'center', justifyContent: 'center',
   },
-  dangerBtnText: { fontSize: 15, fontWeight: '600', color: '#E53E3E' },
+  dangerBtnText: { fontSize: 15, fontWeight: '600', color: TANGERINE_DEEP },
   doneBar: {
     height: 54, borderRadius: 16, backgroundColor: CREAM_2,
     alignItems: 'center', justifyContent: 'center',

@@ -52,6 +52,7 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 
 **Listings**
 - Photo listings (up to 6 images) with condition rating, optional restrictions, pickup window, and disposal deadline
+- Photo grid wraps to multiple rows in listing forms and on item detail — no horizontal scroll
 - Configurable pickup window after claiming (donor sets hours; validated against disposal date)
 - Disposal deadline countdown with urgency highlighting
 - Real-time address autocomplete powered by OpenStreetMap
