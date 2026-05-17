@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -63,6 +63,13 @@ export default function NewItemScreen() {
   const [condition, setCondition] = useState<ItemCondition>('good');
   const [restrictions, setRestrictions] = useState('');
   const [pickupLocation, setPickupLocation] = useState(currentUser.defaultAddress ?? '');
+
+  // Fill in default address once profile is available (handles async profile load)
+  useEffect(() => {
+    if (currentUser.defaultAddress && !pickupLocation) {
+      setPickupLocation(currentUser.defaultAddress);
+    }
+  }, [currentUser.defaultAddress]);
   const [pickupWindow, setPickupWindow] = useState('');
   const [disposalDate, setDisposalDate] = useState('');
   const [disposalMethod, setDisposalMethod] = useState<DisposalMethod>('goodwill');
@@ -165,7 +172,7 @@ export default function NewItemScreen() {
           ))}
           {photos.length < 6 && (
             <Pressable style={styles.addPhotoBtn} onPress={addPhoto}>
-              <FontAwesome name="camera" size={24} color="#10B981" />
+              <FontAwesome name="camera" size={24} color="#F26B3A" />
               <Text style={styles.addPhotoText}>
                 {Platform.OS === 'web' ? 'Upload' : 'Add Photo'}
               </Text>
@@ -330,35 +337,42 @@ export default function NewItemScreen() {
         onPress={handleSubmit}
         disabled={submitting}
       >
-        <FontAwesome name="check" size={16} color="#fff" style={{ marginRight: 8 }} />
+        <FontAwesome name="check" size={16} color="#FBF6EE" style={{ marginRight: 8 }} />
         <Text style={styles.submitBtnText}>Create Listing</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
+const TANGERINE = '#F26B3A';
+const CREAM     = '#FBF6EE';
+const CREAM_2   = '#F4ECDD';
+const INK       = '#1F1A17';
+const MUTE      = '#847A70';
+const BORDER    = 'rgba(31,26,23,0.12)';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1, backgroundColor: CREAM },
   content: { paddingBottom: 40 },
   section: {
     backgroundColor: '#fff',
     marginTop: 10,
     padding: 16,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#2d3748', marginBottom: 12 },
-  label: { fontSize: 14, fontWeight: '700', color: '#2d3748', marginBottom: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: INK, marginBottom: 12 },
+  label: { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 6 },
   required: { color: '#e53e3e' },
-  optional: { color: '#a0aec0', fontWeight: '400', fontSize: 13 },
-  hint: { fontSize: 12, color: '#a0aec0', marginBottom: 8 },
+  optional: { color: MUTE, fontWeight: '400', fontSize: 13 },
+  hint: { fontSize: 12, color: MUTE, marginBottom: 8 },
   input: {
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: BORDER,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#2d3748',
-    backgroundColor: '#fafafa',
+    color: INK,
+    backgroundColor: CREAM,
   },
   inputError: {
     borderColor: '#fc8181',
@@ -391,40 +405,40 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#10B981',
+    borderColor: TANGERINE,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  addPhotoText: { fontSize: 12, color: '#10B981', fontWeight: '600' },
+  addPhotoText: { fontSize: 12, color: TANGERINE, fontWeight: '600' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f7fafc',
+    borderColor: BORDER,
+    backgroundColor: CREAM_2,
   },
-  chipActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
-  chipText: { fontSize: 13, color: '#4a5568', fontWeight: '600' },
-  chipTextActive: { color: '#fff' },
+  chipActive: { backgroundColor: TANGERINE, borderColor: TANGERINE },
+  chipText: { fontSize: 13, color: MUTE, fontWeight: '600' },
+  chipTextActive: { color: CREAM },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10B981',
+    backgroundColor: TANGERINE,
     margin: 16,
-    borderRadius: 14,
+    borderRadius: 999,
     paddingVertical: 16,
-    shadowColor: '#000',
+    shadowColor: TANGERINE,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  submitBtnText: { fontSize: 17, fontWeight: '800', color: CREAM },
 });

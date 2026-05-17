@@ -1,12 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from './types';
-import { MOCK_USERS } from './mockData';
-
-const STORAGE_KEY_CURRENT    = '@yoink_it/auth_user';
-const STORAGE_KEY_REGISTERED = '@yoink_it/registered_users';
-// Profile photo stored separately so it never bloats the user JSON arrays.
-const STORAGE_KEY_PHOTO      = '@yoink_it/profile_photo';
+import { supabase } from '@/lib/supabase';
+import { fetchProfile, upsertProfile } from './db';
+import type { User } from './types';
 
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -15,10 +10,11 @@ function normalizePhone(raw: string): string {
   return `+${digits}`;
 }
 
-// Strip the photo before writing to any user-list key.
-function withoutPhoto(u: User): User {
-  const { profilePhoto: _, ...rest } = u;
-  return rest;
+const DEV_BYPASS = process.env.EXPO_PUBLIC_DEV_OTP_BYPASS === 'true';
+const DEV_PASS   = 'YoinkItDev2025!';
+
+function devEmail(phone: string): string {
+  return `dev_${phone.replace(/\D/g, '')}@yoinkit.dev`;
 }
 
 interface AuthContextType {
@@ -36,107 +32,124 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authUser, setAuthUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+  const [authUser, setAuthUser]             = useState<User | null>(null);
+  const [isLoading, setIsLoading]           = useState(true);
+  const [pendingPhone, setPendingPhone]     = useState<string | null>(null);
   const [isExistingUser, setIsExistingUser] = useState(false);
-  const [registeredUsers, setRegisteredUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [stored, regJson, photo] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY_CURRENT),
-          AsyncStorage.getItem(STORAGE_KEY_REGISTERED),
-          AsyncStorage.getItem(STORAGE_KEY_PHOTO),
-        ]);
-        if (regJson) setRegisteredUsers(JSON.parse(regJson));
-        if (stored) {
-          const user: User = JSON.parse(stored);
-          // Reattach photo stored in its own key
-          if (photo) user.profilePhoto = photo;
-          setAuthUser(user);
-        }
-      } catch {
-        // ignore storage errors
-      } finally {
-        setIsLoading(false);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        setAuthUser(profile);
       }
-    })();
+      setIsLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          setAuthUser(null);
+          return;
+        }
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          const profile = await fetchProfile(session.user.id);
+          setAuthUser(profile);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const allKnownUsers = (): User[] => [...MOCK_USERS, ...registeredUsers];
-
-  const sendOTP = async (rawPhone: string) => {
+  const sendOTP = async (rawPhone: string): Promise<void> => {
     const phone = normalizePhone(rawPhone);
     setPendingPhone(phone);
-    const existing = allKnownUsers().find(u => u.phone === phone);
-    setIsExistingUser(!!existing);
+
+    if (DEV_BYPASS) {
+      const email = devEmail(phone);
+      // Try signing in first (existing dev account)
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: DEV_PASS,
+      });
+      if (signInError) {
+        // New dev account — sign up
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password: DEV_PASS,
+        });
+        if (signUpError) throw signUpError;
+        setIsExistingUser(false);
+      } else {
+        // Check if a profile exists for this phone
+        const { data } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('phone', phone)
+          .maybeSingle();
+        setIsExistingUser(!!data);
+      }
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: { channel: 'sms' },
+    });
+    if (error) throw error;
   };
 
   const verifyOTP = async (code: string): Promise<boolean> => {
-    if (code !== '1234') return false;
-    if (!pendingPhone) return false;
-
-    const existing = allKnownUsers().find(u => u.phone === pendingPhone);
-    if (existing) {
-      // Reattach saved photo when logging back in
-      const photo = await AsyncStorage.getItem(STORAGE_KEY_PHOTO);
-      const userWithPhoto = photo ? { ...existing, profilePhoto: photo } : existing;
-      setAuthUser(userWithPhoto);
-      await AsyncStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(withoutPhoto(existing)));
+    if (DEV_BYPASS) {
+      // Session was already established in sendOTP — any code works
+      return code.length === 4;
     }
+
+    if (!pendingPhone) return false;
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: pendingPhone,
+      token: code,
+      type:  'sms',
+    });
+    if (error || !data.session) return false;
     return true;
   };
 
-  const completeRegistration = async (name: string) => {
-    if (!pendingPhone) return;
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name: name.trim(),
-      email: '',
-      phone: pendingPhone,
-      friends: [],
-    };
-    const updatedReg = [...registeredUsers, newUser];
-    setRegisteredUsers(updatedReg);
-    setAuthUser(newUser);
-    await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(withoutPhoto(newUser))),
-      AsyncStorage.setItem(STORAGE_KEY_REGISTERED, JSON.stringify(updatedReg.map(withoutPhoto))),
-    ]);
+  const completeRegistration = async (name: string): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const profile = await upsertProfile({
+      id:    session.user.id,
+      name:  name.trim(),
+      email: session.user.email ?? '',
+      phone: pendingPhone ?? session.user.phone ?? '',
+    });
+    setAuthUser(profile);
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
+    await supabase.auth.signOut();
     setAuthUser(null);
     setPendingPhone(null);
-    await AsyncStorage.removeItem(STORAGE_KEY_CURRENT);
-    // Keep the photo so it's restored on next login
   };
 
-  const updateAuthUser = async (updates: Partial<User>) => {
+  const updateAuthUser = async (updates: Partial<User>): Promise<void> => {
     if (!authUser) return;
-    const updated = { ...authUser, ...updates };
+
+    const { updateProfile } = await import('./db');
+    const fieldMap: Record<string, unknown> = {};
+
+    if (updates.name           !== undefined) fieldMap.name            = updates.name;
+    if (updates.email          !== undefined) fieldMap.email           = updates.email;
+    if (updates.defaultAddress !== undefined) fieldMap.default_address = updates.defaultAddress ?? null;
+    if (updates.itemVisibility !== undefined) fieldMap.item_visibility = updates.itemVisibility;
+    if (updates.profilePhoto   !== undefined) fieldMap.profile_photo   = updates.profilePhoto ?? null;
+    if (updates.friends        !== undefined) fieldMap.friends         = updates.friends;
+
+    const updated = await updateProfile(authUser.id, fieldMap as Parameters<typeof updateProfile>[1]);
     setAuthUser(updated);
-
-    // Save photo separately; save everything else in the user JSON
-    const { profilePhoto, ...userWithoutPhoto } = updated;
-    await AsyncStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(userWithoutPhoto));
-    if (profilePhoto) {
-      await AsyncStorage.setItem(STORAGE_KEY_PHOTO, profilePhoto);
-    } else {
-      await AsyncStorage.removeItem(STORAGE_KEY_PHOTO);
-    }
-
-    // Keep registered_users list current (photos never go in here)
-    const isMock = MOCK_USERS.some(u => u.id === updated.id);
-    if (!isMock) {
-      const updatedReg = registeredUsers.map(u =>
-        u.id === updated.id ? withoutPhoto(updated) : u
-      );
-      setRegisteredUsers(updatedReg);
-      await AsyncStorage.setItem(STORAGE_KEY_REGISTERED, JSON.stringify(updatedReg));
-    }
   };
 
   return (

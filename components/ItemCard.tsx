@@ -54,13 +54,13 @@ export default function ItemCard({ item, onPress, distance }: Props) {
 
         <View style={styles.footer}>
           <View style={styles.footerItem}>
-            <FontAwesome name="map-marker" size={12} color="#718096" style={{ marginRight: 4 }} />
+            <FontAwesome name="map-marker" size={12} color={SKY} style={{ marginRight: 4 }} />
             <Text style={styles.footerText} numberOfLines={1}>{item.pickupLocation}</Text>
           </View>
           <View style={styles.footerRight}>
             {distance !== undefined && (
               <View style={styles.distanceChip}>
-                <FontAwesome name="location-arrow" size={10} color="#3182ce" style={{ marginRight: 3 }} />
+                <FontAwesome name="location-arrow" size={10} color={SKY} style={{ marginRight: 3 }} />
                 <Text style={styles.distanceText}>
                   {distance < 0.1 ? '<0.1' : distance < 10 ? distance.toFixed(1) : Math.round(distance)} mi
                 </Text>
@@ -98,19 +98,23 @@ const CREAM_2        = '#F4ECDD';
 const INK            = '#1F1A17';
 const MUTE           = '#847A70';
 const SAGE           = '#7FA88A';
+const SKY            = '#9DB7C9';
+const ROSE           = '#E89A8D';
 
 const STATUS_LABELS: Record<string, string> = {
-  available: 'Free',
-  claimed:   'Claimed',
-  picked_up: 'Picked Up',
-  disposed:  'Gone',
+  available:       'Free',
+  claimed:         'Claimed',
+  pending_pickup:  'Pending Pickup',
+  picked_up:       'Picked Up',
+  disposed:        'Gone',
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  available: { bg: TANGERINE,  text: CREAM },
-  claimed:   { bg: '#F4C95D',  text: INK   },
-  picked_up: { bg: SAGE,       text: CREAM },
-  disposed:  { bg: '#B0A89E',  text: CREAM },
+  available:       { bg: TANGERINE,  text: CREAM },
+  claimed:         { bg: '#F4C95D',  text: INK   },
+  pending_pickup:  { bg: '#9DB7C9',  text: CREAM },
+  picked_up:       { bg: SAGE,       text: CREAM },
+  disposed:        { bg: '#B0A89E',  text: CREAM },
 };
 
 const styles = StyleSheet.create({
@@ -185,12 +189,12 @@ const styles = StyleSheet.create({
   distanceChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CREAM_2,
+    backgroundColor: 'rgba(157,183,201,0.18)',
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  distanceText: { fontSize: 11, color: INK, fontWeight: '600' },
+  distanceText: { fontSize: 11, color: '#3A6A82', fontWeight: '600' },
   timeChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,5 +206,5 @@ const styles = StyleSheet.create({
   timeChipUrgent: { backgroundColor: '#FFF3EC' },
   timeText: { fontSize: 12, color: MUTE, fontWeight: '600' },
   timeTextUrgent: { color: '#C53030' },
-  waitlistText: { fontSize: 12, color: TANGERINE_DEEP, marginTop: 6, fontWeight: '600' },
+  waitlistText: { fontSize: 12, color: '#8A3A3A', marginTop: 6, fontWeight: '600' },
 });

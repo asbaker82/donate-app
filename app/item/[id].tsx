@@ -82,6 +82,7 @@ export default function ItemDetailScreen() {
     leaveWaitlist,
     releaseClaim,
     markPickedUp,
+    confirmPickup,
     deleteItem,
   } = useApp();
 
@@ -177,10 +178,11 @@ export default function ItemDetailScreen() {
 
   // ── Status badge config ──────────────────────────────────────
   const statusConfig = {
-    available: { label: 'Free',       bg: TANGERINE,   text: CREAM  },
-    claimed:   { label: 'Claimed',    bg: '#F4C95D',   text: INK    },
-    picked_up: { label: 'Picked Up',  bg: SAGE,        text: CREAM  },
-    disposed:  { label: 'Gone',       bg: '#B0A89E',   text: CREAM  },
+    available:       { label: 'Free',         bg: TANGERINE,   text: CREAM  },
+    claimed:         { label: 'Claimed',       bg: '#F4C95D',   text: INK    },
+    pending_pickup:  { label: 'Pending Pickup', bg: '#9DB7C9',  text: CREAM  },
+    picked_up:       { label: 'Picked Up',     bg: SAGE,        text: CREAM  },
+    disposed:        { label: 'Gone',          bg: '#B0A89E',   text: CREAM  },
   }[item.status] ?? { label: item.status, bg: CREAM_2, text: INK };
 
   const hasPhotos = item.photos.length > 0;
@@ -201,7 +203,7 @@ export default function ItemDetailScreen() {
               <Image
                 source={{ uri: item.photos[photoIndex] }}
                 style={styles.heroImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             </Pressable>
           ) : (
@@ -217,11 +219,6 @@ export default function ItemDetailScreen() {
               <FontAwesome name="arrow-left" size={14} color={INK} />
             </Pressable>
             <View style={styles.heroNavRight}>
-              {!isMyItem && (
-                <Pressable style={styles.circBtn}>
-                  <FontAwesome name="heart-o" size={14} color={INK} />
-                </Pressable>
-              )}
               {isMyItem && (
                 <Pressable style={styles.circBtn} onPress={() => router.push(`/item/edit/${item.id}`)}>
                   <FontAwesome name="pencil" size={14} color={INK} />
@@ -262,22 +259,22 @@ export default function ItemDetailScreen() {
               ))}
             </View>
           )}
-
-          {/* Thumbnail strip */}
-          {item.photos.length > 1 && (
-            <ScrollView horizontal style={styles.thumbStrip} showsHorizontalScrollIndicator={false}>
-              {item.photos.map((uri, i) => (
-                <Pressable key={i} onPress={() => { setPhotoIndex(i); }}>
-                  <Image
-                    source={{ uri }}
-                    style={[styles.thumb, i === photoIndex && styles.thumbActive]}
-                    resizeMode="cover"
-                  />
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
         </View>
+
+        {/* Thumbnail strip — outside heroContainer so badges don't overlap it */}
+        {item.photos.length > 1 && (
+          <ScrollView horizontal style={styles.thumbStrip} showsHorizontalScrollIndicator={false}>
+            {item.photos.map((uri, i) => (
+              <Pressable key={i} onPress={() => setPhotoIndex(i)}>
+                <Image
+                  source={{ uri }}
+                  style={[styles.thumb, i === photoIndex && styles.thumbActive]}
+                  resizeMode="cover"
+                />
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
         {/* ── Content sheet ─────────────────────────────────── */}
         <View style={styles.sheet}>
@@ -292,13 +289,19 @@ export default function ItemDetailScreen() {
           <Text style={styles.title}>{item.title}</Text>
 
           {/* Claimed-by notice */}
-          {item.status === 'claimed' && (
+          {(item.status === 'claimed' || item.status === 'pending_pickup') && (
             <View style={styles.claimNotice}>
               <FontAwesome name="clock-o" size={13} color={TANGERINE_DEEP} />
               <Text style={styles.claimNoticeText}>
-                {isClaimedByMe
-                  ? `You claimed this · ${hoursToPickup}h to pick up`
-                  : `Claimed by ${claimedByUser?.name ?? 'someone'} · ${hoursToPickup}h left`}
+                {item.status === 'pending_pickup'
+                  ? isMyItem
+                    ? `Pickup submitted by ${claimedByUser?.name ?? 'the claimant'} — tap below to confirm`
+                    : isClaimedByMe
+                      ? 'Pickup submitted — waiting for donor to confirm'
+                      : `Pickup pending confirmation by ${donor?.name ?? 'donor'}`
+                  : isClaimedByMe
+                    ? `You claimed this · ${hoursToPickup}h to pick up`
+                    : `Claimed by ${claimedByUser?.name ?? 'someone'} · ${hoursToPickup}h left`}
               </Text>
             </View>
           )}
@@ -333,7 +336,8 @@ export default function ItemDetailScreen() {
                     setSmsVisible(true);
                   }}
                 >
-                  <Text style={styles.waveBtnText}>Wave 👋</Text>
+                  <FontAwesome name="comment" size={12} color={CREAM} style={{ marginRight: 5 }} />
+                  <Text style={styles.waveBtnText}>Text {donor.name.split(' ')[0]}</Text>
                 </Pressable>
               )}
             </View>
@@ -386,26 +390,56 @@ export default function ItemDetailScreen() {
             </Text>
           </View>
 
-          {/* Waitlist */}
-          {item.waitlist.length > 0 && (
+          {/* Claimant + Waitlist */}
+          {(item.claimedBy || item.waitlist.length > 0) && (
             <View style={styles.waitlistCard}>
               <View style={styles.waitlistAvatarRow}>
-                {item.waitlist.slice(0, 3).map((uid, i) => {
+                {/* Claimant avatar — always first */}
+                {item.claimedBy && (() => {
+                  const u = getUserById(item.claimedBy);
+                  const fullName = item.claimedBy === currentUser.id ? currentUser.name : (u?.name ?? '?');
+                  return (
+                    <View key="claimant" style={[styles.waitlistAvatar, { backgroundColor: avatarColor(fullName) }]}>
+                      <Text style={styles.waitlistAvatarText}>{fullName.charAt(0).toUpperCase()}</Text>
+                    </View>
+                  );
+                })()}
+                {/* Waitlist avatars — up to 3 total slots after claimant */}
+                {item.waitlist.slice(0, item.claimedBy ? 2 : 3).map((uid, i) => {
                   const u = getUserById(uid);
-                  const name = uid === currentUser.id ? 'You' : u?.name ?? '?';
+                  const fullName = uid === currentUser.id ? currentUser.name : (u?.name ?? '?');
                   return (
                     <View
                       key={uid}
-                      style={[styles.waitlistAvatar, { backgroundColor: avatarColor(name), marginLeft: i > 0 ? -8 : 0 }]}
+                      style={[styles.waitlistAvatar, { backgroundColor: avatarColor(fullName), marginLeft: -8 }]}
                     >
-                      <Text style={styles.waitlistAvatarText}>{name.charAt(0).toUpperCase()}</Text>
+                      <Text style={styles.waitlistAvatarText}>{fullName.charAt(0).toUpperCase()}</Text>
                     </View>
                   );
                 })}
               </View>
               <Text style={styles.waitlistLabel}>
-                <Text style={{ color: INK, fontWeight: '700' }}>{item.waitlist.length}</Text>
-                {item.waitlist.length === 1 ? ' person is' : ' people are'} waiting for this
+                {item.claimedBy && (
+                  <>
+                    <Text style={{ color: INK, fontWeight: '700' }}>
+                      {item.claimedBy === currentUser.id ? 'You' : (getUserById(item.claimedBy)?.name ?? 'Someone')}
+                    </Text>
+                    {' claimed it'}
+                    {item.waitlist.length > 0 && (
+                      <>
+                        {' · '}
+                        <Text style={{ color: INK, fontWeight: '700' }}>{item.waitlist.length}</Text>
+                        {item.waitlist.length === 1 ? ' waiting' : ' waiting'}
+                      </>
+                    )}
+                  </>
+                )}
+                {!item.claimedBy && (
+                  <>
+                    <Text style={{ color: INK, fontWeight: '700' }}>{item.waitlist.length}</Text>
+                    {item.waitlist.length === 1 ? ' person is' : ' people are'} waiting for this
+                  </>
+                )}
               </Text>
             </View>
           )}
@@ -415,19 +449,6 @@ export default function ItemDetailScreen() {
 
       {/* ── Sticky bottom CTA ────────────────────────────────── */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        {/* Donor SMS button — shown to non-owners when donor has phone */}
-        {!isMyItem && donor?.phone && (
-          <Pressable
-            style={styles.chatBtn}
-            onPress={() => {
-              setSmsMessage(`Hi ${donor.name}! I'm interested in your "${item.title}". When can I pick this up?`);
-              setSmsVisible(true);
-            }}
-          >
-            <FontAwesome name="comment" size={18} color={INK} />
-          </Pressable>
-        )}
-
         {/* Primary action */}
         {!isMyItem && item.status === 'available' && (
           <Pressable style={styles.primaryBtn} onPress={handleClaim}>
@@ -438,7 +459,7 @@ export default function ItemDetailScreen() {
 
         {!isMyItem && item.status === 'claimed' && !isClaimedByMe && !isOnWaitlist && (
           <Pressable
-            style={styles.outlineBtn}
+            style={styles.primaryBtn}
             onPress={() => {
               joinWaitlist(item.id);
               playWaitlistSound();
@@ -446,23 +467,46 @@ export default function ItemDetailScreen() {
               setShowWaitlistToast(true);
             }}
           >
-            <Text style={styles.outlineBtnText}>Join Waitlist</Text>
+            <Text style={styles.primaryBtnText}>Join Waitlist</Text>
           </Pressable>
         )}
 
         {!isMyItem && isOnWaitlist && (
-          <Pressable style={styles.ghostBtn} onPress={() => setShowLeaveWaitlistSheet(true)}>
-            <Text style={styles.ghostBtnText}>Leave Waitlist</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => setShowLeaveWaitlistSheet(true)}>
+            <Text style={styles.primaryBtnText}>Leave Waitlist</Text>
           </Pressable>
         )}
 
         {!isMyItem && isClaimedByMe && item.status === 'claimed' && (
           <View style={styles.btnRow}>
-            <Pressable style={styles.primaryBtn} onPress={handlePickedUp}>
-              <Text style={styles.primaryBtnText}>Mark Picked Up ✓</Text>
+            <Pressable style={[styles.primaryBtn, { flex: 1 }]} onPress={handlePickedUp}>
+              <Text style={styles.primaryBtnText} numberOfLines={1} adjustsFontSizeToFit>Mark Picked Up ✓</Text>
             </Pressable>
-            <Pressable style={styles.ghostBtn} onPress={handleRelease}>
+            <Pressable style={[styles.ghostBtn, { flex: 1 }]} onPress={handleRelease}>
               <Text style={styles.ghostBtnText}>Release Claim</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {!isMyItem && isClaimedByMe && item.status === 'pending_pickup' && (
+          <View style={styles.btnRow}>
+            <View style={[styles.doneBar, { flex: 1 }]}>
+              <FontAwesome name="clock-o" size={14} color={MUTE} style={{ marginRight: 8 }} />
+              <Text style={styles.doneText}>Awaiting confirmation…</Text>
+            </View>
+            <Pressable style={[styles.ghostBtn, { flex: 1 }]} onPress={handleRelease}>
+              <Text style={styles.ghostBtnText}>Release Claim</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {isMyItem && item.status === 'pending_pickup' && (
+          <View style={styles.btnRow}>
+            <Pressable style={[styles.primaryBtn, { flex: 1 }]} onPress={() => confirmPickup(item.id)}>
+              <Text style={styles.primaryBtnText} numberOfLines={1} adjustsFontSizeToFit>Confirm Pickup ✓</Text>
+            </Pressable>
+            <Pressable style={[styles.ghostBtn, { flex: 1 }]} onPress={handleRelease}>
+              <Text style={styles.ghostBtnText}>Not Picked Up</Text>
             </Pressable>
           </View>
         )}
@@ -485,6 +529,13 @@ export default function ItemDetailScreen() {
               {item.status === 'picked_up' ? '✓ Picked up — enjoy!' : 'This item is no longer available'}
             </Text>
           </View>
+        )}
+
+        {/* Donor release for accidentally confirmed pickup */}
+        {isMyItem && item.status === 'picked_up' && (
+          <Pressable style={[styles.ghostBtn, { width: '100%', marginTop: 8 }]} onPress={handleRelease}>
+            <Text style={styles.ghostBtnText}>Release Claim</Text>
+          </Pressable>
         )}
       </View>
 
@@ -591,7 +642,7 @@ const styles = StyleSheet.create({
 
   // Hero
   heroContainer:  { position: 'relative', backgroundColor: CREAM_2 },
-  heroImage:      { width: '100%', height: 320 },
+  heroImage:      { width: '100%', height: 320, backgroundColor: INK },
   heroPlaceholder: {
     height: 280, alignItems: 'center', justifyContent: 'center',
     backgroundColor: CREAM_2, gap: 10,
@@ -683,6 +734,7 @@ const styles = StyleSheet.create({
   giverName:    { fontSize: 15, fontWeight: '700', color: INK },
   giverSub:     { fontSize: 12, color: MUTE, marginTop: 1 },
   waveBtn: {
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 999, backgroundColor: INK,
   },
@@ -745,8 +797,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 12,
     borderTopWidth: 1, borderTopColor: 'rgba(31,26,23,0.08)',
     backgroundColor: CREAM,
+    alignItems: 'center',
   },
-  btnRow: { flexDirection: 'row', gap: 10 },
+  btnRow: { flexDirection: 'row', gap: 10, width: '100%' },
   chatBtn: {
     width: 54, height: 54, borderRadius: 16,
     backgroundColor: CREAM_2, alignItems: 'center', justifyContent: 'center',
@@ -755,7 +808,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   primaryBtn: {
-    flex: 1, height: 54, borderRadius: 16,
+    width: '33%', height: 51, borderRadius: 20,
     backgroundColor: TANGERINE,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     shadowColor: TANGERINE_DEEP, shadowOffset: { width: 0, height: 6 },

@@ -15,18 +15,32 @@ import { useApp } from '@/store/AppContext';
 import { Item, DISPOSAL_METHOD_LABELS } from '@/store/types';
 import ItemCard from '@/components/ItemCard';
 
+const TANGERINE = '#F26B3A';
+const BUTTER    = '#F4C95D';
+const ROSE      = '#E89A8D';
+const CREAM     = '#FBF6EE';
+const INK       = '#1F1A17';
+const MUTE      = '#847A70';
+const STEEL_BLUE = '#9DB7C9';
+
+const TAB_ACTIVE: Record<string, { bg: string; text: string }> = {
+  listing:    { bg: TANGERINE,  text: CREAM },
+  claimed:    { bg: BUTTER,     text: INK   },
+  waitlisted: { bg: ROSE,       text: CREAM },
+};
+
 type Tab = 'listing' | 'claimed' | 'waitlisted';
 
 export default function MyItemsScreen() {
-  const { items, getMyItems, deleteItem, markDisposed, getUserById, currentUser } = useApp();
+  const { items, getMyItems, deleteItem, markDisposed, confirmPickup, releaseClaim, getUserById, currentUser } = useApp();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('listing');
 
   const myListings = getMyItems();
-  const activeListings    = myListings.filter(i => i.status === 'available' || i.status === 'claimed');
+  const activeListings    = myListings.filter(i => i.status === 'available' || i.status === 'claimed' || i.status === 'pending_pickup');
   const completedListings = myListings.filter(i => i.status === 'picked_up' || i.status === 'disposed');
 
-  const claimedItems    = items.filter(i => i.claimedBy === currentUser.id && i.donorId !== currentUser.id);
+  const claimedItems    = items.filter(i => i.claimedBy === currentUser.id && i.donorId !== currentUser.id && (i.status === 'claimed' || i.status === 'pending_pickup'));
   const waitlistedItems = items.filter(i => i.waitlist.includes(currentUser.id) && i.donorId !== currentUser.id);
 
   const TABS: { key: Tab; label: string; count: number }[] = [
@@ -65,22 +79,42 @@ export default function MyItemsScreen() {
     <View>
       <ItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
       <View style={styles.actionRow}>
-        {item.claimedBy && (
+        {item.claimedBy && item.status !== 'picked_up' && item.status !== 'disposed' && (
           <View style={styles.claimedByChip}>
-            <FontAwesome name="user" size={11} color="#F26B3A" style={{ marginRight: 4 }} />
+            <FontAwesome name="user" size={11} color="#7A5C00" style={{ marginRight: 4 }} />
             <Text style={styles.claimedByText}>
-              Claimed by {getUserById(item.claimedBy)?.name ?? 'someone'}
+              {item.status === 'pending_pickup'
+                ? `Pickup pending — ${getUserById(item.claimedBy)?.name ?? 'claimant'}`
+                : `Claimed by ${getUserById(item.claimedBy)?.name ?? 'someone'}`}
             </Text>
           </View>
         )}
-        {item.waitlist.length > 0 && (
+        {item.waitlist.length > 0 && item.status !== 'pending_pickup' && (
           <View style={styles.waitlistChip}>
-            <FontAwesome name="list" size={11} color="#744210" style={{ marginRight: 4 }} />
+            <FontAwesome name="list" size={11} color="#8A3A3A" style={{ marginRight: 4 }} />
             <Text style={styles.waitlistChipText}>{item.waitlist.length} waiting</Text>
           </View>
         )}
         <View style={{ flex: 1 }} />
-        {item.status !== 'picked_up' && item.status !== 'disposed' && (
+        {item.status === 'pending_pickup' && (
+          <>
+            <Pressable style={[styles.actionBtn, styles.actionBtnConfirm]} onPress={() => confirmPickup(item.id)}>
+              <FontAwesome name="check" size={13} color={TANGERINE} />
+              <Text style={[styles.actionBtnText, { color: TANGERINE }]}>Confirm Pickup</Text>
+            </Pressable>
+            <Pressable style={styles.actionBtn} onPress={() => releaseClaim(item.id)}>
+              <FontAwesome name="undo" size={13} color="#718096" />
+              <Text style={styles.actionBtnText}>Not Picked Up</Text>
+            </Pressable>
+          </>
+        )}
+        {item.status === 'picked_up' && (
+          <Pressable style={styles.actionBtn} onPress={() => releaseClaim(item.id)}>
+            <FontAwesome name="undo" size={13} color="#718096" />
+            <Text style={styles.actionBtnText}>Release Claim</Text>
+          </Pressable>
+        )}
+        {item.status !== 'picked_up' && item.status !== 'disposed' && item.status !== 'pending_pickup' && (
           <>
             <Pressable style={styles.actionBtn} onPress={() => handleDispose(item)}>
               <FontAwesome name="check-circle" size={14} color="#718096" />
@@ -105,18 +139,21 @@ export default function MyItemsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.filterRow}>
-          {TABS.map(t => (
-            <Pressable
-              key={t.key}
-              style={[styles.filterBtn, tab === t.key && styles.filterBtnActive]}
-              onPress={() => setTab(t.key)}
-            >
-              <Text style={[styles.filterBtnText, tab === t.key && styles.filterBtnTextActive]}>
-                {t.label}
-                {t.count > 0 ? ` (${t.count})` : ''}
-              </Text>
-            </Pressable>
-          ))}
+          {TABS.map(t => {
+            const active = TAB_ACTIVE[t.key];
+            return (
+              <Pressable
+                key={t.key}
+                style={[styles.filterBtn, tab === t.key && { backgroundColor: active.bg }]}
+                onPress={() => setTab(t.key)}
+              >
+                <Text style={[styles.filterBtnText, tab === t.key && { color: active.text }]}>
+                  {t.label}
+                  {t.count > 0 ? ` (${t.count})` : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -159,7 +196,15 @@ export default function MyItemsScreen() {
             data={claimedItems}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
-              <ItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
+              <View>
+                <ItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
+                {item.status === 'pending_pickup' && (
+                  <View style={styles.positionRow}>
+                    <FontAwesome name="clock-o" size={12} color={MUTE} style={{ marginRight: 6 }} />
+                    <Text style={[styles.positionText, { color: MUTE }]}>Waiting for donor to confirm pickup</Text>
+                  </View>
+                )}
+              </View>
             )}
             contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
             showsVerticalScrollIndicator={false}
@@ -184,7 +229,7 @@ export default function MyItemsScreen() {
                 <View>
                   <ItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
                   <View style={styles.positionRow}>
-                    <FontAwesome name="list" size={12} color="#744210" style={{ marginRight: 6 }} />
+                    <FontAwesome name="list" size={12} color="#8A3A3A" style={{ marginRight: 6 }} />
                     <Text style={styles.positionText}>You are #{pos} on the waitlist</Text>
                   </View>
                 </View>
@@ -220,12 +265,10 @@ const styles = StyleSheet.create({
   filterBtn: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    backgroundColor: '#F4ECDD',
   },
-  filterBtnActive: { backgroundColor: '#F26B3A' },
-  filterBtnText: { fontSize: 13, color: '#4a5568', fontWeight: '600' },
-  filterBtnTextActive: { color: '#fff' },
+  filterBtnText: { fontSize: 13, color: '#847A70', fontWeight: '600' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -259,21 +302,21 @@ const styles = StyleSheet.create({
   claimedByChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF3EC',
+    backgroundColor: 'rgba(244,201,93,0.22)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  claimedByText: { fontSize: 12, color: '#F26B3A', fontWeight: '600' },
+  claimedByText: { fontSize: 12, color: '#7A5C00', fontWeight: '600' },
   waitlistChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fffaf0',
+    backgroundColor: 'rgba(232,154,141,0.22)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  waitlistChipText: { fontSize: 12, color: '#744210', fontWeight: '600' },
+  waitlistChipText: { fontSize: 12, color: '#8A3A3A', fontWeight: '600' },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,6 +327,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionBtnDanger: { backgroundColor: '#fff5f5' },
+  actionBtnConfirm: { backgroundColor: '#FFF3EC' },
   actionBtnText: { fontSize: 12, color: '#718096', fontWeight: '600' },
   positionRow: {
     flexDirection: 'row',
@@ -291,7 +335,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 12,
   },
-  positionText: { fontSize: 12, color: '#744210', fontWeight: '600' },
+  positionText: { fontSize: 12, color: '#8A3A3A', fontWeight: '600' },
   empty: {
     flex: 1,
     alignItems: 'center',

@@ -158,7 +158,7 @@ export default function EditProfileScreen() {
           value={name}
           onChangeText={t => { setName(t); if (nameError) setNameError(''); }}
           placeholder="First Last"
-          placeholderTextColor="#a0aec0"
+          placeholderTextColor={MUTE}
           autoCapitalize="words"
           returnKeyType="next"
         />
@@ -170,7 +170,7 @@ export default function EditProfileScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder="you@example.com"
-          placeholderTextColor="#a0aec0"
+          placeholderTextColor={MUTE}
           keyboardType="email-address"
           autoCapitalize="none"
           returnKeyType="next"
@@ -178,7 +178,7 @@ export default function EditProfileScreen() {
 
         <Text style={[styles.label, { marginTop: 16 }]}>Mobile Number</Text>
         <View style={styles.readonlyRow}>
-          <FontAwesome name="lock" size={13} color="#a0aec0" style={{ marginRight: 8 }} />
+          <FontAwesome name="lock" size={13} color={MUTE} style={{ marginRight: 8 }} />
           <Text style={styles.readonlyText}>
             {user.phone
               ? user.phone.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '$1 ($2) $3-$4')
@@ -203,7 +203,7 @@ export default function EditProfileScreen() {
         </View>
         {defaultAddress ? (
           <Pressable onPress={() => setDefaultAddress('')} style={styles.clearAddressBtn}>
-            <FontAwesome name="times-circle" size={13} color="#a0aec0" style={{ marginRight: 5 }} />
+            <FontAwesome name="times-circle" size={13} color={MUTE} style={{ marginRight: 5 }} />
             <Text style={styles.clearAddressText}>Clear address</Text>
           </Pressable>
         ) : null}
@@ -278,8 +278,17 @@ export default function EditProfileScreen() {
   );
 }
 
+const TANGERINE  = '#F26B3A';
+const TANG_DEEP  = '#D8531F';
+const CREAM      = '#FBF6EE';
+const CREAM_2    = '#F4ECDD';
+const INK        = '#1F1A17';
+const INK_2      = '#3A332E';
+const MUTE       = '#847A70';
+const DIVIDER    = 'rgba(31,26,23,0.08)';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1, backgroundColor: CREAM },
   content: { paddingBottom: 48 },
 
   photoSection: {
@@ -287,6 +296,8 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     backgroundColor: '#fff',
     marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: DIVIDER,
   },
   avatarWrap: {
     width: 96,
@@ -303,11 +314,11 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#10B981',
+    backgroundColor: CREAM_2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitials: { fontSize: 34, fontWeight: '800', color: '#fff' },
+  avatarInitials: { fontSize: 34, fontWeight: '800', color: INK_2 },
   cameraOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -315,15 +326,15 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#4a5568',
+    backgroundColor: TANGERINE,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
   },
-  photoHint: { fontSize: 13, color: '#718096' },
+  photoHint: { fontSize: 13, color: MUTE },
   removePhotoBtn: { marginTop: 8 },
-  removePhotoText: { fontSize: 13, color: '#e53e3e' },
+  removePhotoText: { fontSize: 13, color: TANG_DEEP },
 
   card: {
     backgroundColor: '#fff',
@@ -331,41 +342,41 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 14,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: INK,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#2d3748', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 13, color: '#718096', marginBottom: 14, lineHeight: 18 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: INK, marginBottom: 4 },
+  sectionSubtitle: { fontSize: 13, color: MUTE, marginBottom: 14, lineHeight: 18 },
 
-  label: { fontSize: 13, fontWeight: '600', color: '#4a5568', marginBottom: 6 },
+  label: { fontSize: 13, fontWeight: '600', color: INK_2, marginBottom: 6 },
   input: {
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: DIVIDER,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#2d3748',
-    backgroundColor: '#f7fafc',
+    color: INK,
+    backgroundColor: CREAM,
   },
-  inputError: { borderColor: '#e53e3e' },
-  errorText: { color: '#e53e3e', fontSize: 12, marginTop: 4 },
+  inputError: { borderColor: TANG_DEEP },
+  errorText: { color: TANG_DEEP, fontSize: 12, marginTop: 4 },
 
   readonlyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: DIVIDER,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: CREAM_2,
   },
-  readonlyText: { fontSize: 15, color: '#718096' },
-  readonlyHint: { fontSize: 12, color: '#a0aec0', marginTop: 5 },
+  readonlyText: { fontSize: 15, color: MUTE },
+  readonlyHint: { fontSize: 12, color: MUTE, marginTop: 5, opacity: 0.7 },
 
   visibilityOption: {
     flexDirection: 'row',
@@ -374,54 +385,54 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: DIVIDER,
     marginBottom: 10,
-    backgroundColor: '#f7fafc',
+    backgroundColor: CREAM,
   },
   visibilityOptionSelected: {
-    borderColor: '#10B981',
-    backgroundColor: '#ECFDF5',
+    borderColor: TANGERINE,
+    backgroundColor: '#FFF3EE',
   },
   radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#cbd5e0',
+    borderColor: DIVIDER,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
     flexShrink: 0,
   },
-  radioSelected: { borderColor: '#10B981' },
+  radioSelected: { borderColor: TANGERINE },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#10B981',
+    backgroundColor: TANGERINE,
   },
-  visibilityLabel: { fontSize: 14, fontWeight: '600', color: '#4a5568' },
-  visibilityLabelSelected: { color: '#10B981' },
-  visibilityDesc: { fontSize: 12, color: '#718096', marginTop: 3, lineHeight: 17 },
+  visibilityLabel: { fontSize: 14, fontWeight: '600', color: INK_2 },
+  visibilityLabelSelected: { color: TANGERINE },
+  visibilityDesc: { fontSize: 12, color: MUTE, marginTop: 3, lineHeight: 17 },
   clearAddressBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
     alignSelf: 'flex-start',
   },
-  clearAddressText: { fontSize: 13, color: '#a0aec0' },
+  clearAddressText: { fontSize: 13, color: MUTE },
 
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10B981',
+    backgroundColor: TANGERINE,
     marginHorizontal: 16,
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 999,
     height: 52,
   },
   saveBtnPressed: { opacity: 0.85 },
-  saveBtnDisabled: { backgroundColor: '#a0aec0' },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  saveBtnDisabled: { backgroundColor: MUTE },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: CREAM },
 });

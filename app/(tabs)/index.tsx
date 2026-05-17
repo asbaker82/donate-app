@@ -169,11 +169,11 @@ export default function BrowseScreen() {
     inputRef.current?.focus();
   };
 
-  const handleSetAlert = () => {
+  const handleSetAlert = async () => {
     const keyword = search.trim();
     if (!keyword) return;
     addToSearchHistory(keyword);
-    const alreadyExists = addSearchNotification(keyword);
+    const alreadyExists = await addSearchNotification(keyword);
     if (alreadyExists) {
       if (Platform.OS === 'web') {
         window.alert(`You already have an alert set for "${keyword}".`);
@@ -301,23 +301,27 @@ export default function BrowseScreen() {
         )}
       </View>
 
-      {/* Distance filter chips — only shown when user has a default address */}
-      {currentUser.defaultAddress ? (
-        <View style={styles.filterRow}>
-          <FontAwesome name="location-arrow" size={12} color="#847A70" style={{ marginRight: 2 }} />
-          {([null, 5, 10, 25, 50] as (number | null)[]).map(miles => (
+      {/* Distance filter row — always visible */}
+      <View style={styles.filterRow}>
+        <FontAwesome name="location-arrow" size={12} color="#847A70" style={{ marginRight: 2 }} />
+        {currentUser.defaultAddress ? (
+          ([null, 5, 10, 25, 50] as (number | null)[]).map(miles => (
             <Pressable
               key={miles ?? 'any'}
               style={[styles.filterBtn, styles.distanceBtn, maxMiles === miles && styles.distanceBtnActive]}
               onPress={() => setMaxMiles(miles)}
             >
               <Text style={[styles.filterBtnText, styles.distanceBtnText, maxMiles === miles && styles.distanceBtnTextActive]}>
-                {miles === null ? 'Any dist.' : `≤ ${miles} mi`}
+                {miles === null ? 'Any' : `≤ ${miles} mi`}
               </Text>
             </Pressable>
-          ))}
-        </View>
-      ) : null}
+          ))
+        ) : (
+          <Pressable onPress={() => router.push('/edit-profile')} style={styles.setAddressPrompt}>
+            <Text style={styles.setAddressText}>Set your address in Profile to filter by distance →</Text>
+          </Pressable>
+        )}
+      </View>
 
       {sortedFiltered.length === 0 ? (
         <View style={styles.empty}>
@@ -473,9 +477,11 @@ const styles = StyleSheet.create({
   filterBtnTextActive: { color: '#FBF6EE' },
   matchCount: { fontSize: 12, color: '#847A70', marginLeft: 'auto' },
   distanceBtn: { backgroundColor: '#F4ECDD', borderWidth: 1, borderColor: 'rgba(31,26,23,0.1)' },
-  distanceBtnActive: { backgroundColor: '#1F1A17', borderColor: '#1F1A17' },
+  distanceBtnActive: { backgroundColor: '#9DB7C9', borderColor: '#9DB7C9' },
   distanceBtnText: { color: '#847A70' },
   distanceBtnTextActive: { color: '#FBF6EE' },
+  setAddressPrompt: { flex: 1 },
+  setAddressText: { fontSize: 12, color: '#847A70', fontStyle: 'italic' },
 
   empty: {
     flex: 1,

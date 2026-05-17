@@ -58,7 +58,7 @@ export default function ConfirmSheet({
             <FontAwesome
               name={destructive ? 'undo' : 'question-circle'}
               size={22}
-              color={destructive ? '#e53e3e' : '#10B981'}
+              color={destructive ? TANG_DEEP : TANGERINE}
             />
           </View>
         </View>
@@ -91,6 +91,13 @@ export default function ConfirmSheet({
   );
 }
 
+const TANGERINE = '#F26B3A';
+const TANG_DEEP = '#D8531F';
+const CREAM     = '#FBF6EE';
+const CREAM_2   = '#F4ECDD';
+const INK       = '#1F1A17';
+const MUTE      = '#847A70';
+
 const styles = StyleSheet.create({
   root: {
     position: 'absolute',
@@ -104,13 +111,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: CREAM,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 24,
     paddingBottom: 36,
     paddingTop: 12,
-    shadowColor: '#000',
+    shadowColor: INK,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -120,7 +127,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: CREAM_2,
     alignSelf: 'center',
     marginBottom: 20,
   },
@@ -129,33 +136,33 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#FFF3EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconWrapDestructive: { backgroundColor: '#fff5f5' },
-  title: { fontSize: 18, fontWeight: '800', color: '#1a202c', textAlign: 'center', marginBottom: 8 },
-  message: { fontSize: 14, color: '#718096', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  iconWrapDestructive: { backgroundColor: '#FFF3EC' },
+  title: { fontSize: 18, fontWeight: '800', color: INK, textAlign: 'center', marginBottom: 8 },
+  message: { fontSize: 14, color: MUTE, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   btnRow: { flexDirection: 'row', gap: 12 },
   cancelBtn: {
     flex: 1,
     height: 50,
-    borderRadius: 12,
-    backgroundColor: '#edf2f7',
+    borderRadius: 999,
+    backgroundColor: CREAM_2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#4a5568' },
+  cancelBtnText: { fontSize: 15, fontWeight: '600', color: MUTE },
   confirmBtn: {
     flex: 1,
     height: 50,
-    borderRadius: 12,
-    backgroundColor: '#10B981',
+    borderRadius: 999,
+    backgroundColor: TANGERINE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmBtnDestructive: { backgroundColor: '#fff5f5', borderWidth: 1.5, borderColor: '#fc8181' },
-  confirmBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  confirmBtnTextDestructive: { color: '#e53e3e' },
+  confirmBtnDestructive: { backgroundColor: TANG_DEEP },
+  confirmBtnText: { fontSize: 15, fontWeight: '700', color: CREAM },
+  confirmBtnTextDestructive: { color: CREAM },
   btnPressed: { opacity: 0.75 },
 });

@@ -6,9 +6,11 @@ A React Native / Expo app for sharing household items with friends. Donors post 
 
 - **Expo SDK 54** / React Native 0.81 (Expo Router v3, file-based routing)
 - **TypeScript** throughout
-- **React Context API** for all state — no Redux or Zustand
-- **AsyncStorage** for persistence (web = localStorage)
+- **Supabase** — Postgres database, row-level security, realtime item updates, phone OTP auth
+- **TanStack Query** — server state, optimistic updates, and AsyncStorage persistence via `@tanstack/react-query-persist-client`
+- **React Context API** for auth state and local UI state — no Redux or Zustand
 - **Nominatim (OpenStreetMap)** for address autocomplete and distance calculation — no API key required
+- **Bricolage Grotesque 800** via `@expo-google-fonts/bricolage-grotesque` for the header wordmark
 
 ## Running locally
 
@@ -38,12 +40,15 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 
 ## Features
 
+**Onboarding**
+- Animated welcome screen — sticker peel entry animation, idle wobble, staggered content fades
+- Phone + OTP auth with friend discovery from device contacts at signup
+
 **Browsing & discovery**
 - Fuzzy search with typo tolerance across title, description, and restrictions
 - Status filter chips (All / Available / Claimed) and distance filter (≤ 5 / 10 / 25 / 50 mi)
 - Distance chip on each listing card showing miles from your home address
 - Search alerts — save a keyword and be notified when a matching item is posted
-- Search history dropdown with recent terms
 
 **Listings**
 - Photo listings (up to 6 images) with condition rating, optional restrictions, pickup window, and disposal deadline
@@ -54,13 +59,14 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 **Claiming & waitlist**
 - Claim items directly; join a waitlist when already claimed
 - Automatic waitlist promotion when a claim deadline passes
+- Two-party pickup confirmation — donee marks picked up, donor confirms; either party can release back to claimed
 - One-tap driving directions and Text Donor (SMS) from item detail
 - Pickup deadline shown in a slide-up toast after claiming
 
 **My Items**
 - Three tabs: items you're **listing**, items you've **claimed**, items you're **waitlisted** for
 - Waitlisted tab shows your queue position
-- Donors can dispose or remove their own active listings
+- Donors can confirm pickup, dispose, or remove their own active listings
 
 **Profile & social**
 - Add friends from device contacts or by browsing other app users
@@ -72,22 +78,27 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 
 ```
 app/
-  (auth)/          Phone → OTP → name → contacts onboarding flow
+  (auth)/          Welcome → Phone → OTP → name → contacts onboarding flow
   (tabs)/          Browse, My Items, Profile (profile via header icon)
   item/            Detail, new listing, edit listing
   add-friends.tsx
   edit-profile.tsx
-components/        ItemCard, DatePickerInput, AddressInput, ImageLightbox,
+components/        HeaderLogo, ItemCard, DatePickerInput, AddressInput, ImageLightbox,
                    CustomTabBar, ProfileHeaderButton, ClaimToast, WaitlistToast,
                    ConfirmSheet, ClaimCelebration, ImageCropModal (web-only)
 store/
   AuthContext.tsx  Auth state + AsyncStorage persistence
-  AppContext.tsx   All app state and mutations
+  AppContext.tsx   All app state and mutations (TanStack Query)
   types.ts         Canonical TypeScript types
   mockData.ts      Seed users and items
+  db.ts            Supabase query/mutation helpers
+lib/
+  queryClient.ts   TanStack QueryClient + AsyncStorage persister
 utils/
   geocode.ts       Nominatim geocoding + Haversine distance
   sounds.ts        Claim / waitlist sounds (AudioContext on web, expo-av WAV on native)
+supabase/
+  schema.sql       Full DB schema with RLS policies
 ```
 
 See [CLAUDE.md](CLAUDE.md) for architecture details.

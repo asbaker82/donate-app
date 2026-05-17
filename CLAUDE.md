@@ -29,14 +29,14 @@ Wraps `AppProvider` in `app/_layout.tsx`. Persists to `AsyncStorage` (web = loca
 - `@yoink_it/registered_users` — array of registered user JSON (no photos)
 - `@yoink_it/profile_photo` — photo stored separately to avoid 5 MB localStorage quota
 
-The mock users (phones `+15555550101`–`0104`) bypass OTP and log in directly. All other numbers go through phone → OTP (`1234` always works) → name → contacts flow. The routing guard in `app/_layout.tsx` uses `useSegments` + `useEffect` to redirect unauthenticated users to `/(auth)/phone` and authenticated users away from auth screens. During the one-frame gap while auth resolves, `AppContext` uses a stub user `{ id: '', name: '', ... }` to prevent a `useApp must be within AppProvider` crash.
+The mock users (phones `+15555550101`–`0104`) bypass OTP and log in directly. All other numbers go through phone → OTP (`1234` always works) → name → contacts flow. The routing guard in `app/_layout.tsx` uses `useSegments` + `useEffect` to redirect unauthenticated users to `/(auth)/welcome` and authenticated users away from auth screens. During the one-frame gap while auth resolves, `AppContext` uses a stub user `{ id: '', name: '', ... }` to prevent a `useApp must be within AppProvider` crash.
 
 ### App state — `store/AppContext.tsx`
 All non-auth state in a single React Context accessed via `useApp()`. No Redux/Zustand.
 
 - `store/types.ts` — canonical types. Read `Item`, `User`, `ItemVisibility`, `SearchNotification` before touching any feature.
 - `store/mockData.ts` — 4 seed users, 5 seed items. Mock users all have `itemVisibility: 'both'` so any user who adds them as a friend can see their listings.
-- Key mutations: `claimItem`, `joinWaitlist`, `leaveWaitlist`, `releaseClaim`, `markPickedUp`, `markDisposed`, `createItem`, `updateItem`, `deleteItem`
+- Key mutations: `claimItem`, `joinWaitlist`, `leaveWaitlist`, `releaseClaim`, `markPickedUp`, `confirmPickup`, `markDisposed`, `createItem`, `updateItem`, `deleteItem`
 - `processExpiredClaims` runs on a 30-second `setInterval` — promotes `waitlist[0]` to claimant when `claimDeadline` passes, or resets to `available`.
 
 ### Item visibility
@@ -49,8 +49,9 @@ Mock users are set to `'both'` so newly registered users can see listings immedi
 ### Routing — Expo Router (file-based)
 ```
 app/
-  _layout.tsx              Root stack. Auth guard lives here. White header via screenOptions.
+  _layout.tsx              Root stack. Auth guard lives here. Loads BricolageGrotesque_800ExtraBold font.
   (auth)/
+    welcome.tsx            Animated welcome screen — sticker peel entry + stagger fades. First screen for unauthenticated users.
     phone.tsx              Phone entry → sends OTP
     verify.tsx             OTP entry (always "1234") → existing user → tabs, new user → name
     name.tsx               Name entry for new users
@@ -78,8 +79,9 @@ Path alias `@/` maps to the repo root.
 
 ### Key business logic
 - **Claim flow**: `available → claimed` (sets `claimDeadline = now + claimPickupHours * 3600000`). Deadline passes → `processExpiredClaims` promotes next waiter or resets to `available`.
-- **Item lifecycle**: `available → claimed → picked_up` (happy path) or any state `→ disposed`.
+- **Item lifecycle**: `available → claimed → pending_pickup → picked_up` (happy path) or any state `→ disposed`. The `pending_pickup` step is a two-party confirmation: donee calls `markPickedUp` (sets `pending_pickup`), donor calls `confirmPickup` (sets `picked_up`). Either party can call `releaseClaim` to revert.
 - **Validation**: When creating or editing a listing, `claimPickupHours` must be less than the hours remaining until `disposalDate` — enforced in both `new.tsx` and `edit/[id].tsx`.
+- **Supabase constraint**: The `items.status` check constraint must include `'pending_pickup'`. If adding this status to a live DB, run: `ALTER TABLE public.items DROP CONSTRAINT items_status_check; ALTER TABLE public.items ADD CONSTRAINT items_status_check CHECK (status IN ('available','claimed','pending_pickup','picked_up','disposed'));`
 
 ### Sounds — `utils/sounds.ts`
 - `playClaimSound()` — celebratory C5→E5→G5 arpeggio on web via `AudioContext`; native builds a WAV buffer in memory and plays it via `expo-av` + `expo-file-system` (no bundled audio files).
@@ -89,7 +91,7 @@ Path alias `@/` maps to the repo root.
 ### Distance — `utils/geocode.ts`
 - `geocodeAddress(address)` calls Nominatim (OpenStreetMap, no API key). Module-level `Map` cache prevents duplicate calls. Rate-limit: 1100 ms delay between requests.
 - `haversineMiles(a, b)` computes driving-distance proxy in miles.
-- Browse screen geocodes user's `defaultAddress` + each visible item's `pickupLocation`, then filters by `maxMiles` chip selection.
+- Browse screen geocodes user's `defaultAddress` + each visible item's `pickupLocation`, then filters by `maxMiles` chip selection. Distance filter chips (≤5, 10, 25, 50 mi, Any) are always visible; if the user has no `defaultAddress` set, a prompt to set one is shown instead of distances.
 - Item detail screen computes and displays distance in the Pickup Details card.
 
 ### Platform differences
@@ -102,6 +104,7 @@ Path alias `@/` maps to the repo root.
 ### Components reference
 | Component | Purpose |
 |---|---|
+| `HeaderLogo` | Speed-wordmark logo used as `headerTitle` on all screens. Accepts `size` prop (default 22). Uses `BricolageGrotesque_800ExtraBold` font. Three horizontal speed bars rendered via flow layout (not absolute positioning) for reliable header rendering. |
 | `CustomTabBar` | Custom bottom tab bar (Browse + My Items only) |
 | `ProfileHeaderButton` | Avatar/initials button in header right → profile screen |
 | `ItemCard` | Card used in Browse, My Items, and items-list. Accepts optional `distance` prop. |
@@ -145,4 +148,4 @@ Brand tokens (defined as file-level consts in each file that needs them — no s
 | Sage | `#7FA88A` | Pickup pin, "picked up" badge |
 | Butter | `#F4C95D` | "Claimed" badge background |
 
-All headers are white (`#fff`) with dark Ink text.
+**Tab headers** (Browse, My Items, Profile) use `backgroundColor: '#FBF6EE'` (Cream) with `headerShadowVisible: false` so the header blends into the page. **Stack headers** (item detail, modals, edit screens) use white (`#fff`). All headers use `HeaderLogo` as `headerTitle` — do not use plain string titles.

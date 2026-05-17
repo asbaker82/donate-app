@@ -8,7 +8,14 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/store/AuthContext';
 import { useApp } from '@/store/AppContext';
 import { User } from '@/store/types';
-import { MOCK_USERS } from '@/store/mockData';
+
+const TANGERINE = '#F26B3A';
+const CREAM     = '#FBF6EE';
+const CREAM_2   = '#F4ECDD';
+const INK       = '#1F1A17';
+const INK_2     = '#3A332E';
+const MUTE      = '#847A70';
+const DIVIDER   = 'rgba(31,26,23,0.06)';
 
 type Section = { title: string; subtitle?: string; data: User[] };
 
@@ -23,19 +30,18 @@ export default function AddFriendsScreen() {
 
   useEffect(() => {
     buildSections();
-  }, []);
+  }, [users.length]);
 
   async function buildSections() {
     if (!authUser) { setLoading(false); return; }
     const existingFriends = new Set(authUser.friends);
-    const allCandidates = MOCK_USERS.filter(u => u.id !== authUser.id && !existingFriends.has(u.id));
+    const allCandidates = users.filter(u => u.id !== authUser.id && !existingFriends.has(u.id));
 
     if (Platform.OS === 'web') {
-      // Web: can't read contacts — show all app users
       setSections([
         {
           title: 'People on Yoink It',
-          subtitle: 'Add contacts on your phone to see who\'s already here.',
+          subtitle: "Add contacts on your phone to see who's already here.",
           data: allCandidates,
         },
       ]);
@@ -78,7 +84,7 @@ export default function AddFriendsScreen() {
       if (fromContacts.length > 0) {
         built.push({
           title: 'From Your Contacts',
-          subtitle: 'These people are in your phone\'s contacts and already on Yoink It.',
+          subtitle: "These people are in your phone's contacts and already on Yoink It.",
           data: fromContacts,
         });
       }
@@ -124,14 +130,14 @@ export default function AddFriendsScreen() {
     <View style={styles.container}>
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#10B981" />
+          <ActivityIndicator size="large" color={TANGERINE} />
           <Text style={styles.loadingText}>
             {Platform.OS !== 'web' ? 'Reading your contacts…' : 'Loading…'}
           </Text>
         </View>
       ) : allUsers.length === 0 ? (
         <View style={styles.emptyState}>
-          <FontAwesome name="users" size={40} color="#e2e8f0" />
+          <FontAwesome name="users" size={40} color={CREAM_2} />
           <Text style={styles.emptyTitle}>No new friends to add</Text>
           <Text style={styles.emptySubtitle}>
             {contactsPermission === 'denied'
@@ -178,7 +184,7 @@ export default function AddFriendsScreen() {
                   ]}
                   onPress={() => toggleFriend(item.id)}
                 >
-                  <FontAwesome name={isAdded ? 'check' : 'plus'} size={14} color={isAdded ? '#fff' : '#10B981'} />
+                  <FontAwesome name={isAdded ? 'check' : 'plus'} size={14} color={isAdded ? CREAM : TANGERINE} />
                   <Text style={[styles.addBtnText, isAdded && styles.addBtnTextAdded]}>
                     {isAdded ? 'Added' : 'Add'}
                   </Text>
@@ -204,27 +210,19 @@ export default function AddFriendsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  container: { flex: 1, backgroundColor: CREAM },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { fontSize: 14, color: '#718096' },
+  loadingText: { fontSize: 14, color: MUTE },
   list: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
-  sectionHeader: {
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
+  sectionHeader: { paddingTop: 16, paddingBottom: 8 },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#a0aec0',
+    color: MUTE,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#a0aec0',
-    marginTop: 3,
-    lineHeight: 16,
-  },
+  sectionSubtitle: { fontSize: 12, color: MUTE, marginTop: 3, lineHeight: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,7 +231,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     gap: 12,
-    shadowColor: '#000',
+    shadowColor: INK,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -243,42 +241,42 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: CREAM_2,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  avatarText: { fontSize: 16, fontWeight: '700', color: '#4a5568' },
+  avatarText: { fontSize: 16, fontWeight: '700', color: INK_2 },
   info: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '600', color: '#2d3748' },
-  phone: { fontSize: 13, color: '#718096', marginTop: 2 },
+  name: { fontSize: 15, fontWeight: '600', color: INK },
+  phone: { fontSize: 13, color: MUTE, marginTop: 2 },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderWidth: 1.5,
-    borderColor: '#10B981',
-    borderRadius: 20,
+    borderColor: TANGERINE,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 7,
     backgroundColor: '#fff',
     flexShrink: 0,
   },
-  addBtnAdded: { backgroundColor: '#10B981', borderColor: '#10B981' },
+  addBtnAdded: { backgroundColor: TANGERINE, borderColor: TANGERINE },
   addBtnPressed: { opacity: 0.75 },
-  addBtnText: { fontSize: 13, fontWeight: '600', color: '#10B981' },
-  addBtnTextAdded: { color: '#fff' },
+  addBtnText: { fontSize: 13, fontWeight: '600', color: TANGERINE },
+  addBtnTextAdded: { color: CREAM },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#4a5568', textAlign: 'center', marginTop: 16 },
-  emptySubtitle: { fontSize: 14, color: '#a0aec0', textAlign: 'center', marginTop: 8, lineHeight: 20 },
-  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff' },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: INK_2, textAlign: 'center', marginTop: 16 },
+  emptySubtitle: { fontSize: 14, color: MUTE, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  footer: { padding: 16, borderTopWidth: 1, borderTopColor: DIVIDER, backgroundColor: '#fff' },
   saveBtn: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
+    backgroundColor: TANGERINE,
+    borderRadius: 999,
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: CREAM },
   btnPressed: { opacity: 0.75 },
 });

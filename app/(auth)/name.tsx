@@ -6,6 +6,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/store/AuthContext';
 
+const TANGERINE = '#F26B3A';
+const TANG_DEEP = '#D8531F';
+const CREAM_2   = '#F4ECDD';
+const INK       = '#1F1A17';
+const MUTE      = '#847A70';
+const BORDER    = '#E8DDD0';
+
 export default function NameScreen() {
   const router = useRouter();
   const { completeRegistration } = useAuth();
@@ -33,7 +40,7 @@ export default function NameScreen() {
     >
       <View style={styles.container}>
         <View style={styles.header}>
-          <View style={styles.icon}>
+          <View style={styles.iconCircle}>
             <Text style={styles.iconText}>👋</Text>
           </View>
           <Text style={styles.title}>What's your name?</Text>
@@ -47,7 +54,7 @@ export default function NameScreen() {
           <TextInput
             style={[styles.input, error ? styles.inputError : null]}
             placeholder="First Last"
-            placeholderTextColor="#a0aec0"
+            placeholderTextColor={MUTE}
             value={name}
             onChangeText={t => { setName(t); if (error) setError(''); }}
             autoCapitalize="words"
@@ -81,41 +88,41 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#fff' },
   container: { flex: 1, padding: 24, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: 40 },
-  icon: {
+  iconCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: CREAM_2,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
   iconText: { fontSize: 36 },
-  title: { fontSize: 24, fontWeight: '800', color: '#2d3748' },
-  subtitle: { fontSize: 15, color: '#718096', textAlign: 'center', marginTop: 8, lineHeight: 22 },
+  title: { fontSize: 24, fontWeight: '800', color: INK },
+  subtitle: { fontSize: 15, color: MUTE, textAlign: 'center', marginTop: 8, lineHeight: 22 },
   form: { width: '100%', maxWidth: 400, alignSelf: 'center' },
-  label: { fontSize: 14, fontWeight: '600', color: '#4a5568', marginBottom: 8 },
+  label: { fontSize: 14, fontWeight: '600', color: INK, marginBottom: 8 },
   input: {
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: BORDER,
     borderRadius: 12,
-    backgroundColor: '#f7fafc',
+    backgroundColor: CREAM_2,
     paddingHorizontal: 16,
     height: 52,
     fontSize: 17,
-    color: '#2d3748',
+    color: INK,
   },
-  inputError: { borderColor: '#e53e3e' },
-  errorText: { color: '#e53e3e', fontSize: 13, marginTop: 6 },
+  inputError: { borderColor: TANG_DEEP },
+  errorText: { color: TANG_DEEP, fontSize: 13, marginTop: 6 },
   btn: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
+    backgroundColor: TANGERINE,
+    borderRadius: 999,
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
   },
-  btnDisabled: { backgroundColor: '#a0aec0' },
+  btnDisabled: { backgroundColor: MUTE },
   btnPressed: { opacity: 0.85 },
   btnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });

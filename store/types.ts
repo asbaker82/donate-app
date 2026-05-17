@@ -8,7 +8,7 @@ export type DisposalMethod =
   | 'keep';
 
 export type ItemCondition = 'excellent' | 'good' | 'fair' | 'poor';
-export type ItemStatus = 'available' | 'claimed' | 'picked_up' | 'disposed';
+export type ItemStatus = 'available' | 'claimed' | 'pending_pickup' | 'picked_up' | 'disposed';
 
 export interface Item {
   id: string;
