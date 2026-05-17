@@ -11,6 +11,7 @@ import { User } from '@/store/types';
 import { MOCK_USERS } from '@/store/mockData';
 
 const TANGERINE = '#F26B3A';
+const CREAM     = '#FBF6EE';
 const CREAM_2   = '#F4ECDD';
 const INK       = '#1F1A17';
 const INK_2     = '#3A332E';
@@ -180,7 +181,7 @@ export default function ContactsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: CREAM },
   header: { alignItems: 'center', paddingTop: 48, paddingBottom: 24, paddingHorizontal: 24 },
   iconCircle: {
     width: 72,
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    backgroundColor: '#fff',
+    backgroundColor: CREAM,
   },
   addBtnAdded: { backgroundColor: TANGERINE, borderColor: TANGERINE },
   addBtnPressed: { opacity: 0.75 },

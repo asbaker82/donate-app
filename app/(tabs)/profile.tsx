@@ -6,6 +6,7 @@ import { useApp } from '@/store/AppContext';
 import { useAuth } from '@/store/AuthContext';
 
 const TANGERINE      = '#F26B3A';
+const TANG_DEEP      = '#D8531F';
 const CREAM          = '#FBF6EE';
 const CREAM_2        = '#F4ECDD';
 const INK            = '#1F1A17';
@@ -207,7 +208,7 @@ export default function ProfileScreen() {
                   hitSlop={8}
                   onPress={() => deleteSearchNotification(notif.id)}
                 >
-                  <FontAwesome name="trash" size={14} color="#e53e3e" />
+                  <FontAwesome name="trash" size={14} color={TANG_DEEP} />
                 </Pressable>
               </View>
             </View>
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 40 },
 
   // Avatar / header
-  avatarSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 24, backgroundColor: '#fff', gap: 4 },
+  avatarSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 24, backgroundColor: CREAM, gap: 4 },
   avatarWrap: { position: 'relative', marginBottom: 12 },
   avatarImage: { width: 80, height: 80, borderRadius: 40 },
   avatar: {
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: CREAM,
   },
   name: { fontSize: 22, fontWeight: '700', color: INK },
   meta: { fontSize: 14, color: MUTE },
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', margin: 16, gap: 8 },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: CREAM_2,
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
@@ -317,7 +318,7 @@ const styles = StyleSheet.create({
 
   // Sections
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: CREAM_2,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 12,
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#FFF3EC',
+    backgroundColor: CREAM,
   },
   alertActions: { flexDirection: 'row', gap: 12 },
   alertIconBtn: { padding: 4 },
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
   alertSaveBtnText: { fontSize: 13, fontWeight: '700', color: CREAM },
 
   // How it works
-  empty: { color: '#B0A89E', fontSize: 14 },
+  empty: { color: MUTE, fontSize: 14 },
   tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   tipIcon: {
     width: 36,

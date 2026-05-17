@@ -148,4 +148,8 @@ Brand tokens (defined as file-level consts in each file that needs them — no s
 | Sage | `#7FA88A` | Pickup pin, "picked up" badge |
 | Butter | `#F4C95D` | "Claimed" badge background |
 
-**Tab headers** (Browse, My Items, Profile) use `backgroundColor: '#FBF6EE'` (Cream) with `headerShadowVisible: false` so the header blends into the page. **Stack headers** (item detail, modals, edit screens) use white (`#fff`). All headers use `HeaderLogo` as `headerTitle` — do not use plain string titles.
+**All screen backgrounds** use Cream (`#FBF6EE`) — auth screens, tab screens, and stack screens alike. Do not use `#fff` as a screen background.
+
+**Tab headers** (Browse, My Items, Profile) use `backgroundColor: '#FBF6EE'` (Cream) with `headerShadowVisible: false` so the header blends into the page. **Stack headers** (item detail, modals, edit screens) keep the default white (`#fff`) from React Navigation. All headers use `HeaderLogo` as `headerTitle` — do not use plain string titles.
+
+**Cards and surfaces** within a screen use Cream 2 (`#F4ECDD`) to lift above the Cream background. Destructive actions use Tangerine Deep (`#D8531F`), never `#e53e3e` or other reds.

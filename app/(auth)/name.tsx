@@ -8,6 +8,7 @@ import { useAuth } from '@/store/AuthContext';
 
 const TANGERINE = '#F26B3A';
 const TANG_DEEP = '#D8531F';
+const CREAM     = '#FBF6EE';
 const CREAM_2   = '#F4ECDD';
 const INK       = '#1F1A17';
 const MUTE      = '#847A70';
@@ -85,7 +86,7 @@ export default function NameScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#fff' },
+  flex: { flex: 1, backgroundColor: CREAM },
   container: { flex: 1, padding: 24, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: 40 },
   iconCircle: {

@@ -103,10 +103,6 @@ export default function WelcomeScreen() {
             <View style={styles.sticker}>
               <Text style={styles.stickerYoink}>Yoink</Text>
               <Text style={styles.stickerIt}>It.</Text>
-
-              {/* Peel corner: a white rounded rect anchored to the bottom-right corner.
-                  borderTopLeftRadius gives it a smooth curved fold edge. */}
-              <View style={styles.peelCorner} />
             </View>
           </View>
         </Animated.View>
@@ -147,7 +143,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: CREAM,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -185,19 +181,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // White rounded rect anchored to the bottom-right corner.
-  // borderTopLeftRadius gives the fold edge its curve; the other radii
-  // match the sticker's own corner so it looks like the corner is lifting.
-  peelCorner: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 56,
-    height: 40,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderBottomRightRadius: STICKER_R,
   },
   stickerYoink: {
     fontFamily: 'BricolageGrotesque_800ExtraBold',
