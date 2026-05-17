@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Yoink It",
-    "slug": "yoink-it",
+    "slug": "donate-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.asbaker.yoinkit"
+      "bundleIdentifier": "com.asbaker.yoinkit",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.asbaker.yoinkit",
