@@ -35,8 +35,8 @@ The mock users (phones `+15555550101`–`0104`) bypass OTP and log in directly. 
 All non-auth state in a single React Context accessed via `useApp()`. No Redux/Zustand.
 
 - `store/types.ts` — canonical types. Read `Item`, `User`, `ItemVisibility`, `SearchNotification` before touching any feature.
-- `store/mockData.ts` — 4 seed users, 5 seed items. Mock users all have `itemVisibility: 'both'` so any user who adds them as a friend can see their listings.
-- Key mutations: `claimItem`, `joinWaitlist`, `leaveWaitlist`, `releaseClaim`, `markPickedUp`, `confirmPickup`, `markDisposed`, `createItem`, `updateItem`, `deleteItem`
+- `store/mockData.ts` — 4 seed users, 5 give items, 10 borrow items. Mock users all have `itemVisibility: 'both'` so any user who adds them as a friend can see their listings.
+- Key mutations — give flow: `claimItem`, `joinWaitlist`, `leaveWaitlist`, `releaseClaim`, `markPickedUp`, `confirmPickup`, `markDisposed`, `createItem`, `updateItem`, `deleteItem`; borrow flow: `createBorrowRequest`, `approveBorrowRequest`, `rejectBorrowRequest`, `markBorrowReturned`, `confirmBorrowReturn`, `addBlockedPeriod`, `removeBlockedPeriod`
 - `processExpiredClaims` runs on a 30-second `setInterval` — promotes `waitlist[0]` to claimant when `claimDeadline` passes, or resets to `available`.
 
 ### Item visibility
@@ -59,7 +59,7 @@ app/
   (tabs)/
     _layout.tsx            Tab bar + headerRight profile icon on Browse and My Items
     index.tsx              Browse — fuzzy search, status filter, distance filter, search alerts
-    my-items.tsx           My Items — Listing / Claimed / Waitlisted tabs + FAB
+    my-items.tsx           My Items — Listing / Claimed / Waitlisted / Lending tabs + FAB
     profile.tsx            Profile — reached via header icon, not tab bar
   item/
     [id].tsx               Item detail — claim, waitlist, pickup, dispose, edit, SMS, lightbox, distance
@@ -79,7 +79,8 @@ Path alias `@/` maps to the repo root.
 
 ### Key business logic
 - **Claim flow**: `available → claimed` (sets `claimDeadline = now + claimPickupHours * 3600000`). Deadline passes → `processExpiredClaims` promotes next waiter or resets to `available`.
-- **Item lifecycle**: `available → claimed → pending_pickup → picked_up` (happy path) or any state `→ disposed`. The `pending_pickup` step is a two-party confirmation: donee calls `markPickedUp` (sets `pending_pickup`), donor calls `confirmPickup` (sets `picked_up`). Either party can call `releaseClaim` to revert.
+- **Give lifecycle**: `available → claimed → pending_pickup → picked_up` (happy path) or any state `→ disposed`. The `pending_pickup` step is a two-party confirmation: donee calls `markPickedUp` (sets `pending_pickup`), donor calls `confirmPickup` (sets `picked_up`). Either party can call `releaseClaim` to revert.
+- **Borrow lifecycle**: Donee submits a date-range request → donor approves (auto-rejects overlapping pending requests via `datesOverlap`) → item status `borrowed` with `borrowedBy`/`borrowedUntil`. Return is two-party: donee calls `markBorrowReturned` (sets `pending_return`), donor calls `confirmBorrowReturn` (clears borrow fields, resets to `available`). Donors can block periods via `addBlockedPeriod`/`removeBlockedPeriod` (stored as JSONB array on the item). Borrow items use `disposalDate: '2099-12-31'` and `claimPickupHours: 0` as sentinels — do not show disposal UI for them.
 - **Validation**: When creating or editing a listing, `claimPickupHours` must be less than the hours remaining until `disposalDate` — enforced in both `new.tsx` and `edit/[id].tsx`.
 - **Supabase constraint**: The `items.status` check constraint must include `'pending_pickup'`, `'borrowed'`, and `'pending_return'`. Migration for a live DB:
   ```sql
@@ -163,6 +164,7 @@ Brand tokens (defined as file-level consts in each file that needs them — no s
 | Mute | `#847A70` | Placeholder / label text |
 | Sage | `#7FA88A` | Pickup pin, "picked up" badge |
 | Butter | `#F4C95D` | "Claimed" badge background |
+| Sky | `#7BA7BC` | "LEND" badge, borrow accent color |
 
 **All screen backgrounds** use Cream (`#FBF6EE`) — auth screens, tab screens, and stack screens alike. Do not use `#fff` as a screen background.
 

@@ -1,6 +1,6 @@
 # Yoink It
 
-A React Native / Expo app for sharing household items with friends. Donors post items they no longer need with a disposal deadline; friends claim, waitlist, and arrange pickup before the item goes to charity.
+A React Native / Expo app for sharing household items with friends. Donors post items they no longer need — either to give away with a disposal deadline, or to lend out for a set period. Friends can claim, waitlist, borrow, and arrange pickup directly through the app.
 
 ## Stack
 
@@ -50,7 +50,7 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 - Distance chip on each listing card showing miles from your home address
 - Search alerts — save a keyword and be notified when a matching item is posted
 
-**Listings**
+**Give Away listings**
 - Photo listings (up to 6 images) with condition rating, optional restrictions, pickup window, and disposal deadline
 - Photo grid wraps to multiple rows in listing forms and on item detail — no horizontal scroll
 - Configurable pickup window after claiming (donor sets hours; validated against disposal date)
@@ -64,9 +64,17 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 - One-tap driving directions and Text Donor (SMS) from item detail
 - Pickup deadline shown in a slide-up toast after claiming
 
+**Lend Out listings**
+- Donors can list items to lend rather than give away — marked with a sky-blue "LEND" badge
+- Friends submit date-range borrow requests; donor approves or rejects inline
+- Approving one request auto-rejects any overlapping pending requests
+- Two-party return confirmation — borrower marks returned, donor confirms
+- Donors can block out unavailable date ranges (vacations, reservations, etc.)
+
 **My Items**
-- Three tabs: items you're **listing**, items you've **claimed**, items you're **waitlisted** for
+- Four tabs: items you're **listing**, items you've **claimed**, items you're **waitlisted** for, and items you're **lending** out
 - Waitlisted tab shows your queue position
+- Lending tab shows pending borrow requests with inline approve / decline, and active borrows with return confirmation
 - Donors can confirm pickup, dispose, or remove their own active listings
 
 **Profile & social**
