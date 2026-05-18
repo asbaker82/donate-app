@@ -20,9 +20,7 @@ export default function ItemCard({ item, onPress, distance }: Props) {
   const daysLeft = disposalDate ? Math.ceil((disposalDate.getTime() - Date.now()) / 86400000) : null;
   const isUrgent = daysLeft !== null && daysLeft <= 3;
 
-  const statusStyle = isBorrow
-    ? BORROW_STATUS_STYLES[item.status] ?? BORROW_STATUS_STYLES.available
-    : STATUS_STYLES[item.status] ?? STATUS_STYLES.available;
+  const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.available;
 
   return (
     <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} onPress={onPress}>
@@ -34,16 +32,11 @@ export default function ItemCard({ item, onPress, distance }: Props) {
             <FontAwesome name="image" size={36} color="#C9BCA8" />
           </View>
         )}
-        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-          <Text style={[styles.statusText, { color: statusStyle.text }]}>
-            {isBorrow ? BORROW_STATUS_LABELS[item.status] ?? 'Borrow' : STATUS_LABELS[item.status]}
+        <View style={[styles.statusBadge, { backgroundColor: isBorrow ? '#7BA7BC' : statusStyle.bg }]}>
+          <Text style={[styles.statusText, { color: isBorrow ? CREAM : statusStyle.text }]}>
+            {isBorrow ? 'Borrow' : STATUS_LABELS[item.status]}
           </Text>
         </View>
-        {isBorrow && (
-          <View style={styles.lendBadge}>
-            <Text style={styles.lendBadgeText}>LEND</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.body}>
@@ -141,17 +134,6 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   disposed:        { bg: '#B0A89E',  text: CREAM },
 };
 
-const BORROW_STATUS_LABELS: Record<string, string> = {
-  available:       'Available',
-  borrowed:        'Borrowed',
-  pending_return:  'Returning',
-};
-
-const BORROW_STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  available:       { bg: '#7BA7BC',  text: CREAM },
-  borrowed:        { bg: '#F4C95D',  text: INK   },
-  pending_return:  { bg: SAGE,       text: CREAM },
-};
 
 const styles = StyleSheet.create({
   card: {
@@ -243,14 +225,4 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 12, color: MUTE, fontWeight: '600' },
   timeTextUrgent: { color: '#C53030' },
   waitlistText: { fontSize: 12, color: '#8A3A3A', marginTop: 6, fontWeight: '600' },
-  lendBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#7BA7BC',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  lendBadgeText: { fontSize: 10, fontWeight: '800', color: CREAM, letterSpacing: 1 },
 });

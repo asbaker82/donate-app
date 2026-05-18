@@ -16,7 +16,9 @@ import ItemCard from '@/components/ItemCard';
 import { Item } from '@/store/types';
 import { geocodeAddress, haversineMiles } from '@/utils/geocode';
 
-type Filter = 'all' | 'available' | 'claimed';
+type ListingFilter = 'free' | 'borrow';
+type FreeStatusFilter = 'all' | 'available' | 'claimed';
+type BorrowStatusFilter = 'all' | 'available' | 'borrowed';
 
 // Levenshtein edit distance
 function editDistance(a: string, b: string): number {
@@ -90,8 +92,14 @@ export default function BrowseScreen() {
   const router = useRouter();
 
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [listingFilter, setListingFilter] = useState<ListingFilter>('free');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [maxMiles, setMaxMiles] = useState<number | null>(null);
+
+  const handleListingFilterChange = (lf: ListingFilter) => {
+    setListingFilter(lf);
+    setStatusFilter('all');
+  };
   const [historyOpen, setHistoryOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
@@ -136,7 +144,8 @@ export default function BrowseScreen() {
   const scored = friendItems
     .map(item => ({ item, score: fuzzyScore(search, item) }))
     .filter(({ score }) => score > 0)
-    .filter(({ item }) => filter === 'all' || item.status === filter)
+    .filter(({ item }) => listingFilter === 'free' ? item.listingType === 'give' : item.listingType === 'borrow')
+    .filter(({ item }) => statusFilter === 'all' || item.status === statusFilter)
     .filter(({ item }) => {
       if (!maxMiles || !userCoords) return true;
       const dist = itemDistances[item.id];
@@ -283,21 +292,55 @@ export default function BrowseScreen() {
         </View>
       )}
 
-      {/* Filter chips */}
+      {/* Listing type filter — Free / Borrow */}
       <View style={styles.filterRow}>
-        {(['all', 'available', 'claimed'] as Filter[]).map(f => (
-          <Pressable
-            key={f}
-            style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text style={[styles.filterBtnText, filter === f && styles.filterBtnTextActive]}>
-              {f === 'all' ? 'All' : f === 'available' ? 'Available' : 'Claimed'}
-            </Text>
-          </Pressable>
-        ))}
+        <Pressable
+          style={[styles.filterBtn, listingFilter === 'free' && styles.filterBtnActive]}
+          onPress={() => handleListingFilterChange('free')}
+        >
+          <Text style={[styles.filterBtnText, listingFilter === 'free' && styles.filterBtnTextActive]}>
+            Free
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.filterBtn, listingFilter === 'borrow' && styles.filterBtnBorrowActive]}
+          onPress={() => handleListingFilterChange('borrow')}
+        >
+          <Text style={[styles.filterBtnText, listingFilter === 'borrow' && styles.filterBtnTextActive]}>
+            Borrow
+          </Text>
+        </Pressable>
         {search.trim().length > 0 && scored.length > 0 && (
           <Text style={styles.matchCount}>{scored.length} match{scored.length !== 1 ? 'es' : ''}</Text>
+        )}
+      </View>
+
+      {/* Status filter — conditional on listing type */}
+      <View style={styles.filterRow}>
+        {listingFilter === 'free' ? (
+          (['all', 'available', 'claimed'] as FreeStatusFilter[]).map(f => (
+            <Pressable
+              key={f}
+              style={[styles.filterBtn, styles.statusBtn, statusFilter === f && styles.filterBtnActive]}
+              onPress={() => setStatusFilter(f)}
+            >
+              <Text style={[styles.filterBtnText, statusFilter === f && styles.filterBtnTextActive]}>
+                {f === 'all' ? 'All' : f === 'available' ? 'Available' : 'Claimed'}
+              </Text>
+            </Pressable>
+          ))
+        ) : (
+          (['all', 'available', 'borrowed'] as BorrowStatusFilter[]).map(f => (
+            <Pressable
+              key={f}
+              style={[styles.filterBtn, styles.statusBtn, statusFilter === f && styles.filterBtnBorrowActive]}
+              onPress={() => setStatusFilter(f)}
+            >
+              <Text style={[styles.filterBtnText, statusFilter === f && styles.filterBtnTextActive]}>
+                {f === 'all' ? 'All' : f === 'available' ? 'Available' : 'Borrowed'}
+              </Text>
+            </Pressable>
+          ))
         )}
       </View>
 
@@ -473,8 +516,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4ECDD',
   },
   filterBtnActive: { backgroundColor: '#F26B3A' },
+  filterBtnBorrowActive: { backgroundColor: '#7BA7BC' },
   filterBtnText: { fontSize: 13, color: '#847A70', fontWeight: '600' },
   filterBtnTextActive: { color: '#FBF6EE' },
+  statusBtn: { paddingHorizontal: 12, paddingVertical: 5 },
   matchCount: { fontSize: 12, color: '#847A70', marginLeft: 'auto' },
   distanceBtn: { backgroundColor: '#F4ECDD', borderWidth: 1, borderColor: 'rgba(31,26,23,0.1)' },
   distanceBtnActive: { backgroundColor: '#9DB7C9', borderColor: '#9DB7C9' },
