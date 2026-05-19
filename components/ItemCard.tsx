@@ -32,9 +32,19 @@ export default function ItemCard({ item, onPress, distance }: Props) {
             <FontAwesome name="image" size={36} color="#C9BCA8" />
           </View>
         )}
-        <View style={[styles.statusBadge, { backgroundColor: isBorrow ? '#7BA7BC' : statusStyle.bg }]}>
-          <Text style={[styles.statusText, { color: isBorrow ? CREAM : statusStyle.text }]}>
-            {isBorrow ? 'Borrow' : STATUS_LABELS[item.status]}
+        <View style={[styles.statusBadge, {
+          backgroundColor: isBorrow
+            ? (item.status === 'borrowed' || item.status === 'pending_return' ? '#F4C95D' : '#7BA7BC')
+            : statusStyle.bg,
+        }]}>
+          <Text style={[styles.statusText, {
+            color: isBorrow
+              ? (item.status === 'borrowed' || item.status === 'pending_return' ? INK : CREAM)
+              : statusStyle.text,
+          }]}>
+            {isBorrow
+              ? (item.status === 'borrowed' || item.status === 'pending_return' ? 'Borrowed' : 'Borrow')
+              : STATUS_LABELS[item.status]}
           </Text>
         </View>
       </View>

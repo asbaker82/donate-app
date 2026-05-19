@@ -27,6 +27,7 @@ import {
   BlockedPeriod,
 } from '@/store/types';
 import DatePickerInput from '@/components/DatePickerInput';
+import DateRangePicker from '@/components/DateRangePicker';
 import ImageLightbox from '@/components/ImageLightbox';
 import { geocodeAddress, haversineMiles } from '@/utils/geocode';
 import ClaimToast from '@/components/ClaimToast';
@@ -97,6 +98,7 @@ export default function ItemDetailScreen() {
     confirmPickup,
     deleteItem,
     createBorrowRequest,
+    cancelBorrowRequest,
     approveBorrowRequest,
     rejectBorrowRequest,
     markBorrowReturned,
@@ -231,7 +233,7 @@ export default function ItemDetailScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: (isBorrow && !isMyItem && !myBorrowRequest && item.status === 'available') ? 400 : 110 }}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Hero ──────────────────────────────────────────── */}
@@ -553,6 +555,24 @@ export default function ItemDetailScreen() {
                   {new Date(myBorrowRequest.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Text>
               </View>
+              {myBorrowRequest.status === 'pending' && (
+                <Pressable
+                  style={styles.cancelRequestBtn}
+                  onPress={() => {
+                    const doCancel = () => cancelBorrowRequest(item.id, myBorrowRequest.id);
+                    if (Platform.OS === 'web') {
+                      if (window.confirm('Cancel your borrow request?')) doCancel();
+                    } else {
+                      Alert.alert('Cancel Request', 'Are you sure you want to cancel your borrow request?', [
+                        { text: 'Keep', style: 'cancel' },
+                        { text: 'Cancel Request', style: 'destructive', onPress: doCancel },
+                      ]);
+                    }
+                  }}
+                >
+                  <Text style={styles.cancelRequestText}>Cancel</Text>
+                </Pressable>
+              )}
             </View>
           )}
 
@@ -624,26 +644,15 @@ export default function ItemDetailScreen() {
             </View>
           )}
 
-        </View>
-      </ScrollView>
-
-      {/* ── Sticky bottom CTA ────────────────────────────────── */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-
-        {/* Borrow CTAs */}
+        {/* Borrow request form — lives in the scroll area so the calendar can open downward */}
         {isBorrow && !isMyItem && !myBorrowRequest && item.status === 'available' && (
           <View style={styles.borrowRequestForm}>
             <Text style={styles.borrowFormTitle}>Request to Borrow</Text>
-            <View style={{ zIndex: 30 }}>
-              <Text style={styles.borrowFormLabel}>Start date</Text>
-              <DatePickerInput value={borrowStart} onChange={setBorrowStart} />
-            </View>
-            {borrowStart && (
-              <View style={{ zIndex: 20, marginTop: 10 }}>
-                <Text style={styles.borrowFormLabel}>Return by</Text>
-                <DatePickerInput value={borrowEnd} onChange={setBorrowEnd} />
-              </View>
-            )}
+            <DateRangePicker
+              startDate={borrowStart}
+              endDate={borrowEnd}
+              onChange={(s, e) => { setBorrowStart(s); setBorrowEnd(e); }}
+            />
             {borrowStart && borrowEnd && !borrowRequestValid && (
               <Text style={styles.borrowConflictText}>Those dates conflict with an existing booking or blocked period.</Text>
             )}
@@ -665,12 +674,12 @@ export default function ItemDetailScreen() {
           </View>
         )}
 
-        {isBorrow && !isMyItem && myBorrowRequest?.status === 'pending' && (
-          <View style={styles.doneBar}>
-            <FontAwesome name="clock-o" size={14} color={MUTE} style={{ marginRight: 8 }} />
-            <Text style={styles.doneText}>Borrow request sent — waiting for approval</Text>
-          </View>
-        )}
+        </View>
+      </ScrollView>
+
+      {/* ── Sticky bottom CTA ────────────────────────────────── */}
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+
 
         {isBorrow && !isMyItem && isBorrowedByMe && item.status === 'borrowed' && (
           <Pressable style={styles.primaryBtn} onPress={() => {
@@ -703,8 +712,7 @@ export default function ItemDetailScreen() {
         {/* Primary action — Give Away */}
         {!isBorrow && !isMyItem && item.status === 'available' && (
           <Pressable style={styles.primaryBtn} onPress={handleClaim}>
-            <Text style={styles.primaryBtnText}>Yoink it </Text>
-            <Text style={[styles.primaryBtnText, { fontStyle: 'italic' }]}>→</Text>
+            <Text style={styles.primaryBtnText}>Claim →</Text>
           </Pressable>
         )}
 
@@ -1140,12 +1148,30 @@ const styles = StyleSheet.create({
   },
   myRequestLabel: { fontSize: 14, fontWeight: '700', color: INK },
   myRequestDates: { fontSize: 12, color: MUTE, marginTop: 2 },
+  cancelRequestBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFF3EC',
+    borderWidth: 1,
+    borderColor: TANGERINE_DEEP,
+  },
+  cancelRequestText: { fontSize: 12, fontWeight: '700', color: TANGERINE_DEEP },
   borrowedCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#EEF5FA', borderRadius: 14, padding: 14, marginBottom: 12,
   },
   borrowedText: { fontSize: 14, color: INK, flex: 1 },
-  borrowRequestForm: { width: '100%', gap: 6 },
+  borrowRequestForm: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: '#EEF5FA',
+    borderRadius: 14,
+    padding: 16,
+    gap: 6,
+    zIndex: 40,
+  },
   borrowFormTitle: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 4 },
   borrowFormLabel: { fontSize: 12, fontWeight: '700', color: MUTE, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
   borrowConflictText: { fontSize: 12, color: TANGERINE_DEEP, marginTop: 4 },

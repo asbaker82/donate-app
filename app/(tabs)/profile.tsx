@@ -19,10 +19,11 @@ const BORDER         = 'rgba(31,26,23,0.10)';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, updateAuthUser } = useAuth();
   const { currentUser, users, getMyItems, items, searchNotifications, updateSearchNotification, deleteSearchNotification } = useApp();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [friendsExpanded, setFriendsExpanded] = useState(false);
 
   const handleLogout = () => {
     const doLogout = () => logout();
@@ -37,7 +38,41 @@ export default function ProfileScreen() {
   };
 
   const myItems = getMyItems();
-  const friendList = users.filter(u => currentUser.friends.includes(u.id));
+  const friendList = users
+    .filter(u => currentUser.friends.includes(u.id))
+    .sort((a, b) => {
+      const lastName = (n: string) => n.trim().split(' ').slice(-1)[0] ?? n;
+      return lastName(a.name).localeCompare(lastName(b.name));
+    });
+
+  const removeFriend = (friendId: string) => {
+    const activeBorrow = items.find(
+      i => i.donorId === friendId &&
+           i.borrowedBy === currentUser.id &&
+           (i.status === 'borrowed' || i.status === 'pending_return')
+    );
+    if (activeBorrow) {
+      const msg = `You're currently borrowing "${activeBorrow.title}" from this person. Return it before removing them as a friend.`;
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Item Still Borrowed', msg);
+      }
+      return;
+    }
+
+    const doRemove = async () => {
+      await updateAuthUser({ friends: currentUser.friends.filter(id => id !== friendId) });
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Remove this friend?')) doRemove();
+    } else {
+      Alert.alert('Remove Friend', 'Remove this person from your friends?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]);
+    }
+  };
 
   const stats = [
     { label: 'Listed',         value: myItems.length,                                                                    icon: 'gift'        as const, color: TANGERINE, filter: 'listed'  as const },
@@ -103,9 +138,20 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{friendList.length} Friends</Text>
+      <View style={[styles.section, { padding: 0, overflow: 'hidden' }]}>
+        <Pressable
+          style={({ pressed }) => [styles.friendsCardHeader, pressed && { opacity: 0.75 }]}
+          onPress={() => setFriendsExpanded(e => !e)}
+        >
+          <FontAwesome name="users" size={14} color={TANGERINE} style={{ marginRight: 8 }} />
+          <Text style={styles.friendsCardTitle}>{friendList.length} Friend{friendList.length !== 1 ? 's' : ''}</Text>
+          <FontAwesome
+            name={friendsExpanded ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color={MUTE}
+            style={{ marginLeft: 6 }}
+          />
+          <View style={{ flex: 1 }} />
           <Pressable
             style={({ pressed }) => [styles.addFriendsBtn, pressed && { opacity: 0.7 }]}
             onPress={() => router.push('/add-friends')}
@@ -113,41 +159,58 @@ export default function ProfileScreen() {
             <FontAwesome name="user-plus" size={12} color={TANGERINE} style={{ marginRight: 5 }} />
             <Text style={styles.addFriendsBtnText}>Add</Text>
           </Pressable>
-        </View>
-        {friendList.length === 0 ? (
-          <View>
-            <Text style={[styles.empty, { marginBottom: 12 }]}>No friends yet.</Text>
-            <Pressable
-              style={({ pressed }) => [styles.addFriendsCTA, pressed && { opacity: 0.85 }]}
-              onPress={() => router.push('/add-friends')}
-            >
-              <FontAwesome name="user-plus" size={14} color={CREAM} style={{ marginRight: 8 }} />
-              <Text style={styles.addFriendsCTAText}>Add Friends from Contacts</Text>
-            </Pressable>
-          </View>
-        ) : (
-          friendList.map(friend => (
-            <View key={friend.id} style={styles.friendRow}>
-              <View style={styles.friendAvatar}>
-                <Text style={styles.friendAvatarText}>
-                  {friend.name.split(' ').map(n => n[0]).join('')}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.friendName}>{friend.name}</Text>
-                {friend.phone ? (
-                  <Text style={styles.friendMeta}>
-                    {friend.phone.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '($2) $3-$4')}
-                  </Text>
-                ) : null}
-              </View>
-              <View style={styles.friendItemCount}>
-                <Text style={styles.friendItemCountText}>
-                  {items.filter(i => i.donorId === friend.id && (i.status === 'available' || i.status === 'claimed')).length} items
-                </Text>
-              </View>
+        </Pressable>
+
+        {friendsExpanded && (
+          friendList.length === 0 ? (
+            <View style={styles.friendsExpandedBody}>
+              <Text style={[styles.empty, { marginBottom: 12 }]}>No friends yet.</Text>
+              <Pressable
+                style={({ pressed }) => [styles.addFriendsCTA, pressed && { opacity: 0.85 }]}
+                onPress={() => router.push('/add-friends')}
+              >
+                <FontAwesome name="user-plus" size={14} color={CREAM} style={{ marginRight: 8 }} />
+                <Text style={styles.addFriendsCTAText}>Add Friends from Contacts</Text>
+              </Pressable>
             </View>
-          ))
+          ) : (
+            <ScrollView
+              style={[styles.friendsExpandedBody, friendList.length > 5 ? styles.friendScroll : undefined]}
+              scrollEnabled={friendList.length > 5}
+              showsVerticalScrollIndicator={friendList.length > 5}
+              nestedScrollEnabled
+            >
+              {friendList.map(friend => (
+                <View key={friend.id} style={styles.friendRow}>
+                  <View style={styles.friendAvatar}>
+                    <Text style={styles.friendAvatarText}>
+                      {friend.name.split(' ').map(n => n[0]).join('')}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.friendName}>{friend.name}</Text>
+                    {friend.phone ? (
+                      <Text style={styles.friendMeta}>
+                        {friend.phone.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '($2) $3-$4')}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.friendItemCount}>
+                    <Text style={styles.friendItemCountText}>
+                      {items.filter(i => i.donorId === friend.id && (i.status === 'available' || i.status === 'claimed')).length} items
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={({ pressed }) => [styles.removeFriendBtn, pressed && { opacity: 0.6 }]}
+                    onPress={() => removeFriend(friend.id)}
+                    hitSlop={8}
+                  >
+                    <FontAwesome name="times" size={13} color={MUTE} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )
         )}
       </View>
 
@@ -332,7 +395,21 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 12 },
 
-  // Friends
+  // Friends collapsible card
+  friendsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  friendsCardTitle: { fontSize: 15, fontWeight: '700', color: INK },
+  friendsExpandedBody: {
+    borderTopWidth: 1,
+    borderTopColor: DIVIDER,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
   addFriendsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,6 +431,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   addFriendsCTAText: { fontSize: 14, color: CREAM, fontWeight: '700' },
+  friendScroll: { maxHeight: 285 },
   friendRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,6 +458,16 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   friendItemCountText: { fontSize: 12, color: TANGERINE, fontWeight: '600' },
+  removeFriendBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: CREAM_2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    flexShrink: 0,
+  },
 
   // Search alerts
   alertRow: {

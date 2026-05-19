@@ -115,7 +115,7 @@ export default function EditItemScreen() {
     if (!disposalDate.trim())
       next.disposalDate = 'Please choose a disposal date.';
     else if (isNaN(new Date(disposalDate).getTime()))
-      next.disposalDate = 'That date doesn\'t look right — pick one from the calendar or type YYYY-MM-DD.';
+      next.disposalDate = 'That date doesn\'t look right — pick one from the calendar or type MM-DD-YYYY.';
     const hours = parseInt(claimPickupHours, 10);
     if (isNaN(hours) || hours < 1)
       next.claimPickupHours = 'Please enter a pickup window of at least 1 hour.';

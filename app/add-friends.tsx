@@ -149,6 +149,7 @@ export default function AddFriendsScreen() {
         <SectionList
           sections={sections}
           keyExtractor={item => item.id}
+          extraData={added}
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (

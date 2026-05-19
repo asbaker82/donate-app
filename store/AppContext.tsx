@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { QUERY_KEYS } from '@/lib/queryClient';
@@ -35,12 +36,18 @@ interface AppContextType {
   markDisposed: (itemId: string) => Promise<void>;
   // Borrow flow
   createBorrowRequest: (itemId: string, startDate: string, endDate: string) => Promise<void>;
+  cancelBorrowRequest: (itemId: string, requestId: string) => Promise<void>;
   approveBorrowRequest: (itemId: string, requestId: string) => Promise<void>;
   rejectBorrowRequest: (itemId: string, requestId: string) => Promise<void>;
   markBorrowReturned: (itemId: string) => Promise<void>;
   confirmBorrowReturn: (itemId: string) => Promise<void>;
   addBlockedPeriod: (itemId: string, period: BlockedPeriod) => Promise<void>;
   removeBlockedPeriod: (itemId: string, index: number) => Promise<void>;
+  // Dismissed items (local, per-user)
+  dismissed: Set<string>;
+  dismissItem: (itemId: string) => void;
+  restoreItem: (itemId: string) => void;
+  restoreAll: () => void;
   // Search history (local only)
   searchHistory: string[];
   addToSearchHistory: (term: string) => void;
@@ -93,8 +100,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const qc = useQueryClient();
 
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const currentUser: User = authUser ?? { id: '', name: '', email: '', phone: '', friends: [] };
+
+  const dismissedKey = currentUser.id ? `@yoink_it/dismissed/${currentUser.id}` : null;
+
+  useEffect(() => {
+    if (!dismissedKey) return;
+    AsyncStorage.getItem(dismissedKey).then(raw => {
+      if (raw) setDismissed(new Set(JSON.parse(raw)));
+      else setDismissed(new Set());
+    });
+  }, [dismissedKey]);
+
+  const dismissItem = useCallback((itemId: string) => {
+    setDismissed(prev => {
+      const next = new Set(prev);
+      next.add(itemId);
+      if (dismissedKey) AsyncStorage.setItem(dismissedKey, JSON.stringify([...next]));
+      return next;
+    });
+  }, [dismissedKey]);
+
+  const restoreItem = useCallback((itemId: string) => {
+    setDismissed(prev => {
+      const next = new Set(prev);
+      next.delete(itemId);
+      if (dismissedKey) AsyncStorage.setItem(dismissedKey, JSON.stringify([...next]));
+      return next;
+    });
+  }, [dismissedKey]);
+
+  const restoreAll = useCallback(() => {
+    setDismissed(new Set());
+    if (dismissedKey) AsyncStorage.removeItem(dismissedKey);
+  }, [dismissedKey]);
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -540,6 +581,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           });
           qc.invalidateQueries({ queryKey: QUERY_KEYS.items });
         },
+        cancelBorrowRequest: async (itemId, requestId) => {
+          const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
+          const item = snap.find(i => i.id === itemId);
+          if (!item) return;
+          const updatedRequests = item.borrowRequests.filter(r => r.id !== requestId);
+          await borrowRequestMutation.mutateAsync({ itemId, requests: updatedRequests });
+        },
         rejectBorrowRequest: async (itemId, requestId) => {
           const snap = qc.getQueryData<Item[]>(QUERY_KEYS.items) ?? [];
           const item = snap.find(i => i.id === itemId);
@@ -580,6 +628,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (!item) return;
           await blockedPeriodMutation.mutateAsync({ itemId, periods: item.blockedPeriods.filter((_, i) => i !== index) });
         },
+        dismissed,
+        dismissItem,
+        restoreItem,
+        restoreAll,
         searchHistory,
         addToSearchHistory,
         clearSearchHistory,

@@ -33,10 +33,20 @@ function parseISO(s: string): { y: number; m: number; d: number } | null {
   if (m < 0 || m > 11 || d < 1 || d > 31) return null;
   return { y, m, d };
 }
+function isoToDisplay(iso: string): string {
+  if (!iso) return '';
+  const p = parseISO(iso);
+  if (!p) return iso;
+  return `${String(p.m + 1).padStart(2,'0')}-${String(p.d).padStart(2,'0')}-${p.y}`;
+}
 function tryParseLoose(s: string): string | null {
-  // Accept YYYY-MM-DD, MM/DD/YYYY, M/D/YYYY
-  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mdy) return toISO(parseInt(mdy[3],10), parseInt(mdy[1],10)-1, parseInt(mdy[2],10));
+  // Primary: MM-DD-YYYY or M-D-YYYY
+  const mdy_dash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (mdy_dash) return toISO(parseInt(mdy_dash[3],10), parseInt(mdy_dash[1],10)-1, parseInt(mdy_dash[2],10));
+  // Also accept MM/DD/YYYY, M/D/YYYY
+  const mdy_slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy_slash) return toISO(parseInt(mdy_slash[3],10), parseInt(mdy_slash[1],10)-1, parseInt(mdy_slash[2],10));
+  // Fallback: YYYY-MM-DD (ISO, backward compat)
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return s;
   return null;
@@ -71,12 +81,13 @@ interface Props {
   value: string;       // YYYY-MM-DD or ''
   onChange: (iso: string) => void;
   placeholder?: string;
+  dropUp?: boolean;    // open calendar upward instead of downward
 }
 
-export default function DatePickerInput({ value, onChange, placeholder }: Props) {
+export default function DatePickerInput({ value, onChange, placeholder, dropUp }: Props) {
   const now = new Date();
   const parsed = parseISO(value);
-  const [text, setText] = useState(value);
+  const [text, setText] = useState(() => isoToDisplay(value));
   const [open, setOpen] = useState(false);
   const [viewY, setViewY] = useState(parsed?.y ?? now.getFullYear());
   const [viewM, setViewM] = useState(parsed?.m ?? now.getMonth());
@@ -87,7 +98,7 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
     const p = parseISO(iso);
     if (!p) return;
     onChange(iso);
-    setText(iso);
+    setText(isoToDisplay(iso));
     setViewY(p.y);
     setViewM(p.m);
     setOpen(false);
@@ -116,8 +127,8 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
 
   const cells = buildGrid(viewY, viewM);
 
-  const CalendarBody = (
-    <View style={styles.popup}>
+  const calendarInner = (
+    <>
       {/* Month navigation */}
       <View style={styles.navRow}>
         <Pressable style={styles.navBtn} onPress={prevMonth}>
@@ -170,7 +181,7 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
       <Pressable style={styles.todayBtn} onPress={() => pickDay(today)}>
         <Text style={styles.todayBtnText}>Today</Text>
       </Pressable>
-    </View>
+    </>
   );
 
   // On web: inline absolute dropdown. On native: Modal overlay.
@@ -183,7 +194,7 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
           style={styles.input}
           value={text}
           onChangeText={handleTextChange}
-          placeholder={placeholder ?? 'YYYY-MM-DD'}
+          placeholder={placeholder ?? 'MM-DD-YYYY'}
           placeholderTextColor="#a0aec0"
           keyboardType="numbers-and-punctuation"
           autoCorrect={false}
@@ -197,19 +208,20 @@ export default function DatePickerInput({ value, onChange, placeholder }: Props)
         </Pressable>
       </View>
 
-      {Platform.OS === 'web' ? (
+      {Platform.OS === 'web' && !dropUp ? (
         open && (
           <>
-            {/* Invisible backdrop to close on outside click */}
             <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
-            {CalendarBody}
+            <View style={[styles.popupBase, styles.popupDropdown]}>
+              {calendarInner}
+            </View>
           </>
         )
       ) : (
         <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
           <Pressable style={styles.modalOverlay} onPress={() => setOpen(false)}>
             <Pressable onPress={e => e.stopPropagation()}>
-              {CalendarBody}
+              <View style={styles.popupBase}>{calendarInner}</View>
             </Pressable>
           </Pressable>
         </Modal>
@@ -239,7 +251,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 15, color: '#2d3748' },
   toggleBtn: { padding: 4 },
 
-  // Web inline popup
   backdrop: {
     position: 'absolute',
     top: -9999,
@@ -248,10 +259,7 @@ const styles = StyleSheet.create({
     bottom: -9999,
     zIndex: 19,
   },
-  popup: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
+  popupBase: {
     width: CALENDAR_WIDTH,
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -262,12 +270,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 12,
-    zIndex: 30,
     padding: 12,
-    marginTop: 4,
   },
-
-  // Native Modal overlay
+  popupDropdown: {
+    position: 'absolute',
+    left: 0,
+    top: '100%' as any,
+    marginTop: 4,
+    zIndex: 30,
+  },
+  // Native/dropUp Modal overlay
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

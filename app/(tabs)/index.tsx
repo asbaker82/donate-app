@@ -13,10 +13,12 @@ import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useApp } from '@/store/AppContext';
 import ItemCard from '@/components/ItemCard';
+import SwipeableCard from '@/components/SwipeableCard';
+
 import { Item } from '@/store/types';
 import { geocodeAddress, haversineMiles } from '@/utils/geocode';
 
-type ListingFilter = 'free' | 'borrow';
+type ListingFilter = 'all' | 'free' | 'borrow';
 type FreeStatusFilter = 'all' | 'available' | 'claimed';
 type BorrowStatusFilter = 'all' | 'available' | 'borrowed';
 
@@ -83,6 +85,8 @@ export default function BrowseScreen() {
     getFriendItems,
     currentUser,
     items,
+    dismissed,
+    dismissItem,
     searchHistory,
     addToSearchHistory,
     clearSearchHistory,
@@ -92,7 +96,7 @@ export default function BrowseScreen() {
   const router = useRouter();
 
   const [search, setSearch] = useState('');
-  const [listingFilter, setListingFilter] = useState<ListingFilter>('free');
+  const [listingFilter, setListingFilter] = useState<ListingFilter>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [maxMiles, setMaxMiles] = useState<number | null>(null);
 
@@ -144,8 +148,14 @@ export default function BrowseScreen() {
   const scored = friendItems
     .map(item => ({ item, score: fuzzyScore(search, item) }))
     .filter(({ score }) => score > 0)
-    .filter(({ item }) => listingFilter === 'free' ? item.listingType === 'give' : item.listingType === 'borrow')
-    .filter(({ item }) => statusFilter === 'all' || item.status === statusFilter)
+    .filter(({ item }) => listingFilter === 'all' ? true : listingFilter === 'free' ? item.listingType === 'give' : item.listingType === 'borrow')
+    .filter(({ item }) => {
+      if (statusFilter === 'all') return true;
+      if (listingFilter === 'borrow' && statusFilter === 'borrowed') {
+        return item.status === 'borrowed' || item.status === 'pending_return';
+      }
+      return item.status === statusFilter;
+    })
     .filter(({ item }) => {
       if (!maxMiles || !userCoords) return true;
       const dist = itemDistances[item.id];
@@ -157,7 +167,7 @@ export default function BrowseScreen() {
         : new Date(a.item.disposalDate).getTime() - new Date(b.item.disposalDate).getTime()
     );
 
-  const sortedFiltered = scored.map(({ item }) => item);
+  const sortedFiltered = scored.map(({ item }) => item).filter(item => !dismissed.has(item.id));
 
   const handleSubmitSearch = () => {
     const term = search.trim();
@@ -292,31 +302,42 @@ export default function BrowseScreen() {
         </View>
       )}
 
-      {/* Listing type filter — Free / Borrow */}
-      <View style={styles.filterRow}>
-        <Pressable
-          style={[styles.filterBtn, listingFilter === 'free' && styles.filterBtnActive]}
-          onPress={() => handleListingFilterChange('free')}
-        >
-          <Text style={[styles.filterBtnText, listingFilter === 'free' && styles.filterBtnTextActive]}>
-            Free
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.filterBtn, listingFilter === 'borrow' && styles.filterBtnBorrowActive]}
-          onPress={() => handleListingFilterChange('borrow')}
-        >
-          <Text style={[styles.filterBtnText, listingFilter === 'borrow' && styles.filterBtnTextActive]}>
-            Borrow
-          </Text>
-        </Pressable>
+      {/* Listing type segmented control */}
+      <View style={styles.segmentedRow}>
+        <View style={styles.segmentedBar}>
+          <Pressable
+            style={[styles.segment, listingFilter === 'all' && styles.segmentActiveAll]}
+            onPress={() => handleListingFilterChange('all')}
+          >
+            <Text style={[styles.segmentText, listingFilter === 'all' && styles.segmentTextActive]}>
+              All
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segment, listingFilter === 'free' && styles.segmentActiveFree]}
+            onPress={() => handleListingFilterChange('free')}
+          >
+            <Text style={[styles.segmentText, listingFilter === 'free' && styles.segmentTextActive]}>
+              Free
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segment, listingFilter === 'borrow' && styles.segmentActiveBorrow]}
+            onPress={() => handleListingFilterChange('borrow')}
+          >
+            <Text style={[styles.segmentText, listingFilter === 'borrow' && styles.segmentTextActive]}>
+              Borrow
+            </Text>
+          </Pressable>
+        </View>
         {search.trim().length > 0 && scored.length > 0 && (
           <Text style={styles.matchCount}>{scored.length} match{scored.length !== 1 ? 'es' : ''}</Text>
         )}
       </View>
 
-      {/* Status filter — conditional on listing type */}
-      <View style={styles.filterRow}>
+      {/* Status filter — hidden when All is selected */}
+      {listingFilter !== 'all' && (
+      <View style={[styles.filterRow, { justifyContent: 'center' }]}>
         {listingFilter === 'free' ? (
           (['all', 'available', 'claimed'] as FreeStatusFilter[]).map(f => (
             <Pressable
@@ -343,6 +364,7 @@ export default function BrowseScreen() {
           ))
         )}
       </View>
+      )}
 
       {/* Distance filter row — always visible */}
       <View style={styles.filterRow}>
@@ -405,12 +427,15 @@ export default function BrowseScreen() {
           data={sortedFiltered}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <ItemCard item={item} onPress={() => { addToSearchHistory(search.trim()); router.push(`/item/${item.id}`); }} distance={itemDistances[item.id]} />
+            <SwipeableCard onDismiss={() => dismissItem(item.id)}>
+              <ItemCard item={item} onPress={() => { addToSearchHistory(search.trim()); router.push(`/item/${item.id}`); }} distance={itemDistances[item.id]} />
+            </SwipeableCard>
           )}
           contentContainerStyle={{ paddingBottom: 24, paddingTop: 8 }}
           showsVerticalScrollIndicator={false}
         />
       )}
+
     </View>
   );
 }
@@ -515,6 +540,53 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#F4ECDD',
   },
+  segmentedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 10,
+  },
+  segmentedBar: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#EDE6D8',
+    borderRadius: 10,
+    padding: 3,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  segmentActiveAll: {
+    backgroundColor: '#3A332E',
+    shadowColor: '#1F1A17',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentActiveFree: {
+    backgroundColor: '#F26B3A',
+    shadowColor: '#F26B3A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentActiveBorrow: {
+    backgroundColor: '#7BA7BC',
+    shadowColor: '#7BA7BC',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentText: { fontSize: 14, fontWeight: '700', color: '#847A70' },
+  segmentTextActive: { color: '#FBF6EE' },
   filterBtnActive: { backgroundColor: '#F26B3A' },
   filterBtnBorrowActive: { backgroundColor: '#7BA7BC' },
   filterBtnText: { fontSize: 13, color: '#847A70', fontWeight: '600' },

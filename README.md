@@ -46,8 +46,9 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 
 **Browsing & discovery**
 - Fuzzy search with typo tolerance across title, description, and restrictions
-- Status filter chips (All / Available / Claimed) and distance filter (≤ 5 / 10 / 25 / 50 mi)
-- Distance chip on each listing card showing miles from your home address
+- Two-level filter: listing type bar (All / Free / Borrow) + conditional status chips
+- Distance filter (≤ 5 / 10 / 25 / 50 mi) with distance chip on each card
+- Swipe left on any card to hide it; restore hidden items from the trash icon in the tab bar
 - Search alerts — save a keyword and be notified when a matching item is posted
 
 **Give Away listings**
@@ -65,9 +66,9 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 - Pickup deadline shown in a slide-up toast after claiming
 
 **Lend Out listings**
-- Donors can list items to lend rather than give away — marked with a sky-blue "LEND" badge
-- Friends submit date-range borrow requests; donor approves or rejects inline
-- Approving one request auto-rejects any overlapping pending requests
+- Donors can list items to lend rather than give away — marked with a sky-blue "Borrow" badge (yellow "Borrowed" when out)
+- Friends submit date-range borrow requests via an inline range-selection calendar; can cancel pending requests
+- Donor approves or rejects inline; approving auto-rejects any overlapping pending requests
 - Two-party return confirmation — borrower marks returned, donor confirms
 - Donors can block out unavailable date ranges (vacations, reservations, etc.)
 
@@ -92,9 +93,10 @@ app/
   item/            Detail, new listing, edit listing
   add-friends.tsx
   edit-profile.tsx
-components/        HeaderLogo, ItemCard, DatePickerInput, AddressInput, ImageLightbox,
-                   CustomTabBar, ProfileHeaderButton, ClaimToast, WaitlistToast,
-                   ConfirmSheet, ClaimCelebration, ImageCropModal (web-only)
+components/        HeaderLogo, ItemCard, DatePickerInput, DateRangePicker, AddressInput,
+                   SwipeableCard, ImageLightbox, CustomTabBar, ProfileHeaderButton,
+                   ClaimToast, WaitlistToast, ConfirmSheet, ClaimCelebration,
+                   ImageCropModal (web-only)
 store/
   AuthContext.tsx  Auth state + AsyncStorage persistence
   AppContext.tsx   All app state and mutations (TanStack Query)
