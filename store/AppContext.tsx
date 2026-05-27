@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +15,7 @@ import {
   updateProfile,
 } from './db';
 import type { Item, User, SearchNotification, BorrowRequest, BlockedPeriod } from './types';
+import { requestNotificationPermission, sendNotification } from '@/utils/notifications';
 import { useAuth } from './AuthContext';
 
 interface AppContextType {
@@ -203,6 +204,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(processExpiredClaims, 30000);
     return () => clearInterval(interval);
   }, [authUser, processExpiredClaims]);
+
+  // ── Notification permission (request once on login) ───────────────────────
+
+  useEffect(() => {
+    if (!authUser) return;
+    requestNotificationPermission();
+  }, [!!authUser]);
+
+  // ── Action-change notifications ────────────────────────────────────────────
+  // Track item snapshots to detect transitions and fire browser notifications.
+
+  type ItemSnapshot = {
+    status: string;
+    pendingRequestCount: number;
+    myRequestStatus: string | undefined;
+  };
+  const prevItemsRef = useRef<Record<string, ItemSnapshot>>({});
+  const notifInitialisedRef = useRef(false);
+
+  useEffect(() => {
+    if (!authUser || !currentUser.id || items.length === 0) return;
+
+    const prev = prevItemsRef.current;
+
+    // Skip firing on the very first load — only track changes after that.
+    if (!notifInitialisedRef.current) {
+      notifInitialisedRef.current = true;
+      const snapshot: Record<string, ItemSnapshot> = {};
+      for (const item of items) {
+        snapshot[item.id] = {
+          status: item.status,
+          pendingRequestCount: item.borrowRequests.filter(r => r.status === 'pending').length,
+          myRequestStatus: item.borrowRequests.find(r => r.requesterId === currentUser.id)?.status,
+        };
+      }
+      prevItemsRef.current = snapshot;
+      return;
+    }
+
+    const next: Record<string, ItemSnapshot> = {};
+
+    for (const item of items) {
+      const p = prev[item.id];
+      const pendingCount = item.borrowRequests.filter(r => r.status === 'pending').length;
+      const myReqStatus = item.borrowRequests.find(r => r.requesterId === currentUser.id)?.status;
+
+      next[item.id] = { status: item.status, pendingRequestCount: pendingCount, myRequestStatus: myReqStatus };
+
+      if (!p) continue;
+
+      const isMyItem = item.donorId === currentUser.id;
+
+      // Donor: new pending borrow request arrived
+      if (isMyItem && pendingCount > p.pendingRequestCount) {
+        sendNotification('New Borrow Request', `Someone wants to borrow your "${item.title}"`);
+      }
+
+      // Donor: give item moved to pending_pickup (donee says they picked it up)
+      if (isMyItem && item.listingType === 'give' && p.status === 'claimed' && item.status === 'pending_pickup') {
+        sendNotification('Pickup Submitted', `Tap to confirm pickup of "${item.title}"`);
+      }
+
+      // Donor: borrow item returned (pending_return)
+      if (isMyItem && item.listingType === 'borrow' && p.status === 'borrowed' && item.status === 'pending_return') {
+        sendNotification('Return Submitted', `Tap to confirm "${item.title}" was returned`);
+      }
+
+      // Donee: borrow request approved
+      if (!isMyItem && p.myRequestStatus === 'pending' && myReqStatus === 'approved') {
+        sendNotification('Borrow Request Approved!', `Your request for "${item.title}" was approved`);
+      }
+
+      // Donee: borrow request rejected
+      if (!isMyItem && p.myRequestStatus === 'pending' && myReqStatus === 'rejected') {
+        sendNotification('Borrow Request Declined', `Your request for "${item.title}" was not approved`);
+      }
+    }
+
+    prevItemsRef.current = next;
+  }, [items, currentUser.id, !!authUser]);
 
   // ── Mutation helpers ───────────────────────────────────────────────────────
 

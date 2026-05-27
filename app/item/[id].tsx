@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Haptics from 'expo-haptics';
 import { playClaimSound, playWaitlistSound } from '@/utils/sounds';
+import { formatCalendarDate } from '@/utils/dates';
 import { useApp } from '@/store/AppContext';
 import {
   DISPOSAL_METHOD_LABELS,
@@ -72,6 +73,20 @@ function openDirections(address: string) {
   Linking.openURL(url);
 }
 
+function formatTimeLeft(deadline: Date, now: Date): string {
+  const ms = deadline.getTime() - now.getTime();
+  if (ms <= 0) return '';
+  const totalMins = Math.floor(ms / 60000);
+  const days  = Math.floor(totalMins / 1440);
+  const hours = Math.floor((totalMins % 1440) / 60);
+  const mins  = totalMins % 60;
+  const parts: string[] = [];
+  if (days  > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins  > 0 || parts.length === 0) parts.push(`${mins}m`);
+  return parts.join(' ');
+}
+
 function datesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return aStart <= bEnd && aEnd >= bStart;
 }
@@ -105,6 +120,7 @@ export default function ItemDetailScreen() {
     confirmBorrowReturn,
     addBlockedPeriod,
     removeBlockedPeriod,
+    updateItem,
   } = useApp();
 
   const [photoIndex, setPhotoIndex]           = useState(0);
@@ -115,6 +131,7 @@ export default function ItemDetailScreen() {
   const [showWaitlistToast, setShowWaitlistToast] = useState(false);
   const [showReleaseSheet, setShowReleaseSheet]   = useState(false);
   const [showLeaveWaitlistSheet, setShowLeaveWaitlistSheet] = useState(false);
+  const [showRestrictionsSheet, setShowRestrictionsSheet] = useState(false);
   const [smsVisible, setSmsVisible]   = useState(false);
   const [smsMessage, setSmsMessage]   = useState('');
   const [distanceMiles, setDistanceMiles] = useState<number | null>(null);
@@ -123,6 +140,11 @@ export default function ItemDetailScreen() {
   const [blockedStart, setBlockedStart] = useState('');
   const [blockedEnd, setBlockedEnd]   = useState('');
   const [showBlockedForm, setShowBlockedForm] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => { clearInterval(id); };
+  }, []);
 
   const item = items.find(i => i.id === id);
 
@@ -169,9 +191,25 @@ export default function ItemDetailScreen() {
     !periodsConflict(borrowStart, borrowEnd, item.blockedPeriods, item.borrowRequests);
 
   const claimDeadline  = item.claimDeadline ? new Date(item.claimDeadline) : null;
+  const claimExpired   = claimDeadline !== null && claimDeadline <= now;
   const hoursToPickup  = claimDeadline
-    ? Math.max(0, Math.ceil((claimDeadline.getTime() - Date.now()) / 3600000))
+    ? Math.max(0, Math.ceil((claimDeadline.getTime() - now.getTime()) / 3600000))
     : null;
+  const timeLeftLabel  = claimDeadline ? formatTimeLeft(claimDeadline, now) : '';
+  const pickUpWithinValue = (() => {
+    if (claimDeadline && item.status === 'claimed') {
+      return timeLeftLabel ? `${timeLeftLabel} remaining` : 'Pickup window expired';
+    }
+    const totalMins = item.claimPickupHours * 60;
+    const d = Math.floor(totalMins / 1440);
+    const h = Math.floor((totalMins % 1440) / 60);
+    const m = totalMins % 60;
+    const parts: string[] = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0 || parts.length === 0) parts.push(`${m}m`);
+    return `${parts.join(' ')} window`;
+  })();
 
   const distanceLabel = distanceMiles !== null
     ? distanceMiles < 0.1 ? '<0.1 mi'
@@ -179,13 +217,21 @@ export default function ItemDetailScreen() {
     : `${Math.round(distanceMiles)} mi`
     : null;
 
-  const handleClaim = () => {
+  const doClaimItem = () => {
     const deadline = new Date(Date.now() + item.claimPickupHours * 3600000);
     claimItem(item.id);
     playClaimSound();
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setClaimDeadlineDate(deadline);
     setShowClaimToast(true);
+  };
+
+  const handleClaim = () => {
+    if (item.restrictions) {
+      setShowRestrictionsSheet(true);
+    } else {
+      doClaimItem();
+    }
   };
 
   const handleRelease  = () => setShowReleaseSheet(true);
@@ -282,7 +328,7 @@ export default function ItemDetailScreen() {
             {(distanceLabel || item.status === 'claimed') && (
               <View style={styles.infoPill}>
                 <Text style={styles.infoPillText}>
-                  {[distanceLabel, item.status === 'claimed' && hoursToPickup !== null ? `${hoursToPickup}h left` : null]
+                  {[distanceLabel, item.status === 'claimed' ? (timeLeftLabel || 'expired') : null]
                     .filter(Boolean).join(' · ')}
                 </Text>
               </View>
@@ -340,9 +386,30 @@ export default function ItemDetailScreen() {
                       ? 'Pickup submitted — waiting for donor to confirm'
                       : `Pickup pending confirmation by ${donor?.name ?? 'donor'}`
                   : isClaimedByMe
-                    ? `You claimed this · ${hoursToPickup}h to pick up`
-                    : `Claimed by ${claimedByUser?.name ?? 'someone'} · ${hoursToPickup}h left`}
+                    ? `You claimed this · ${timeLeftLabel ? timeLeftLabel + ' remaining' : 'window expired'}`
+                    : `Claimed by ${claimedByUser?.name ?? 'someone'} · ${timeLeftLabel || 'window expired'}`}
               </Text>
+            </View>
+          )}
+
+          {/* Donor expiry notification */}
+          {isMyItem && item.status === 'claimed' && claimExpired && (
+            <View style={styles.expiryBanner}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.expiryTitle}>Pickup window expired</Text>
+                <Text style={styles.expiryBody}>
+                  {claimedByUser?.name ?? 'The claimant'} didn't pick up in time. Extend their window by 1 day, or the item will be released automatically.
+                </Text>
+              </View>
+              <Pressable
+                style={styles.extendBtn}
+                onPress={() => {
+                  const newDeadline = new Date(claimDeadline!.getTime() + 24 * 3600000).toISOString();
+                  updateItem(item.id, { claimDeadline: newDeadline });
+                }}
+              >
+                <Text style={styles.extendBtnText}>Extend 1 Day</Text>
+              </Pressable>
             </View>
           )}
 
@@ -372,7 +439,11 @@ export default function ItemDetailScreen() {
                 <Pressable
                   style={styles.waveBtn}
                   onPress={() => {
-                    setSmsMessage(`Hi ${donor.name}! I'm interested in your "${item.title}". When can I pick this up?`);
+                    setSmsMessage(
+                      !isBorrow && item.status === 'picked_up'
+                        ? `Hi ${donor.name.split(' ')[0]}! Just wanted to say thank you so much for the "${item.title}" — I really appreciate it! — ${currentUser.name.split(' ')[0]}`
+                        : `Hi ${donor.name}! I'm interested in your "${item.title}". When can I pick this up?`
+                    );
                     setSmsVisible(true);
                   }}
                 >
@@ -387,12 +458,12 @@ export default function ItemDetailScreen() {
           <Text style={styles.description}>{item.description}</Text>
 
           {/* Details grid — Give Away */}
-          {!isBorrow && (
+          {!isBorrow && item.status !== 'picked_up' && (
             <View style={styles.detailsGrid}>
               {[
                 { k: 'Pickup',      v: item.pickupLocation },
                 { k: 'Window',      v: item.pickupWindow },
-                { k: 'Claim within', v: `${item.claimPickupHours}h of claiming` },
+                { k: 'Pick Up Within', v: pickUpWithinValue },
                 { k: 'Disposal',    v: disposalDate ? `${disposalDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${daysLeft! <= 0 ? 'expired' : daysLeft === 1 ? 'last day' : `${daysLeft}d left`}${isUrgent ? ' ⚠️' : ''}` : '' },
               ].map((d, i) => (
                 <View key={d.k} style={[styles.detailRow, i > 0 && styles.detailRowBorder]}>
@@ -409,9 +480,14 @@ export default function ItemDetailScreen() {
           {isBorrow && (
             <View style={styles.detailsGrid}>
               {[
-                { k: 'Pickup',    v: item.pickupLocation },
-                { k: 'Availability', v: item.pickupWindow },
-                item.borrowedUntil ? { k: 'Borrowed until', v: new Date(item.borrowedUntil + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) } : null,
+                ...(!isBorrowedByMe ? [{ k: 'Pickup', v: item.pickupLocation }, { k: 'Availability', v: item.pickupWindow }] : []),
+                item.borrowedUntil && !isBorrowedByMe ? { k: 'Borrowed until', v: formatCalendarDate(item.borrowedUntil, { month: 'long', day: 'numeric', year: 'numeric' }) } : null,
+                item.borrowedUntil && isBorrowedByMe ? { k: 'Return Date', v: formatCalendarDate(item.borrowedUntil, { month: 'long', day: 'numeric', year: 'numeric' }) } : null,
+                item.borrowedUntil && isBorrowedByMe ? (() => {
+                  const returnDeadline = new Date(item.borrowedUntil + 'T23:59:59');
+                  const label = formatTimeLeft(returnDeadline, now);
+                  return { k: 'Time Left', v: label || 'Return overdue' };
+                })() : null,
               ].filter(Boolean).map((d, i) => (
                 <View key={d!.k} style={[styles.detailRow, i > 0 && styles.detailRowBorder]}>
                   <Text style={styles.detailKey}>{d!.k}</Text>
@@ -422,22 +498,24 @@ export default function ItemDetailScreen() {
           )}
 
           {/* Pickup / directions card */}
-          <Pressable style={styles.mapCard} onPress={() => openDirections(item.pickupLocation)}>
-            <View style={styles.mapPin}>
-              <FontAwesome name="map-marker" size={20} color={SAGE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.mapCardTitle}>Pickup · {item.pickupLocation}</Text>
-              <Text style={styles.mapCardSub}>
-                Tap for directions
-                {distanceLabel ? ` · ${distanceLabel} away` : ''}
-              </Text>
-            </View>
-            <FontAwesome name="location-arrow" size={14} color={MUTE} />
-          </Pressable>
+          {(isBorrow || item.status !== 'picked_up') && (
+            <Pressable style={styles.mapCard} onPress={() => openDirections(item.pickupLocation)}>
+              <View style={styles.mapPin}>
+                <FontAwesome name="map-marker" size={20} color={SAGE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mapCardTitle}>{isBorrowedByMe ? 'Return' : 'Pickup'} · {item.pickupLocation}</Text>
+                <Text style={styles.mapCardSub}>
+                  Tap for directions
+                  {distanceLabel ? ` · ${distanceLabel} away` : ''}
+                </Text>
+              </View>
+              <FontAwesome name="location-arrow" size={14} color={MUTE} />
+            </Pressable>
+          )}
 
           {/* Disposal destination — Give Away only */}
-          {!isBorrow && (
+          {!isBorrow && item.status !== 'picked_up' && (
             <View style={styles.disposalCard}>
               <FontAwesome name="heart" size={14} color={MUTE} style={{ marginTop: 1 }} />
               <Text style={styles.disposalText}>
@@ -585,7 +663,7 @@ export default function ItemDetailScreen() {
                   ? `Borrowed by ${borrowedByUser?.name ?? 'someone'}`
                   : isBorrowedByMe ? 'You have this borrowed'
                   : `Currently borrowed`}
-                {item.borrowedUntil ? ` until ${new Date(item.borrowedUntil + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                {item.borrowedUntil ? ` until ${formatCalendarDate(item.borrowedUntil)}` : ''}
               </Text>
             </View>
           )}
@@ -782,12 +860,13 @@ export default function ItemDetailScreen() {
         )}
 
         {/* Disposed / picked-up state */}
-        {!isBorrow && (item.status === 'picked_up' || item.status === 'disposed') && (
+        {!isBorrow && item.status === 'disposed' && (
           <View style={styles.doneBar}>
-            <Text style={styles.doneText}>
-              {item.status === 'picked_up' ? '✓ Picked up — enjoy!' : 'This item is no longer available'}
-            </Text>
+            <Text style={styles.doneText}>This item is no longer available</Text>
           </View>
+        )}
+        {!isBorrow && item.status === 'picked_up' && (
+          <Text style={styles.pickedUpText}>✓ Picked up — enjoy!</Text>
         )}
 
         {/* Donor release for accidentally confirmed pickup */}
@@ -817,6 +896,15 @@ export default function ItemDetailScreen() {
         destructive
         onConfirm={() => { setShowLeaveWaitlistSheet(false); leaveWaitlist(item.id); }}
         onCancel={() => setShowLeaveWaitlistSheet(false)}
+      />
+      <ConfirmSheet
+        visible={showRestrictionsSheet}
+        title="Item Has Restrictions"
+        message={`${item.restrictions}\n\nDo you accept these terms?`}
+        confirmLabel="I Accept — Claim →"
+        cancelLabel="Decline"
+        onConfirm={() => { setShowRestrictionsSheet(false); doClaimItem(); }}
+        onCancel={() => setShowRestrictionsSheet(false)}
       />
       <ConfirmSheet
         visible={showReleaseSheet}
@@ -1097,6 +1185,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   doneText: { fontSize: 14, color: MUTE, fontWeight: '500' },
+  pickedUpText: { fontSize: 15, color: SAGE, fontWeight: '600', textAlign: 'center', paddingVertical: 8 },
 
   // Borrow
   blockedCard: {
@@ -1175,6 +1264,20 @@ const styles = StyleSheet.create({
   borrowFormTitle: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 4 },
   borrowFormLabel: { fontSize: 12, fontWeight: '700', color: MUTE, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
   borrowConflictText: { fontSize: 12, color: TANGERINE_DEEP, marginTop: 4 },
+
+  // Expiry banner
+  expiryBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    backgroundColor: '#FFF3EC', borderRadius: 14, padding: 14,
+    marginBottom: 12, borderWidth: 1.5, borderColor: '#FDDCC7',
+  },
+  expiryTitle: { fontSize: 14, fontWeight: '800', color: TANGERINE_DEEP, marginBottom: 4 },
+  expiryBody:  { fontSize: 13, color: INK_2, lineHeight: 18 },
+  extendBtn: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
+    backgroundColor: TANGERINE, alignSelf: 'flex-start', marginTop: 2,
+  },
+  extendBtnText: { fontSize: 13, fontWeight: '700', color: CREAM },
 
   // SMS modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },

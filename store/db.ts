@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { toDateOnly } from '@/utils/dates';
 import type { Item, User, SearchNotification, ItemStatus, BorrowRequest, BlockedPeriod, ListingType } from './types';
 
 // ─── Row types (snake_case from Postgres) ────────────────────────────────────
@@ -75,7 +76,7 @@ export function rowToItem(row: ItemRow): Item {
     borrowRequests:     row.borrow_requests ?? [],
     blockedPeriods:     row.blocked_periods ?? [],
     borrowedBy:         row.borrowed_by ?? undefined,
-    borrowedUntil:      row.borrowed_until ?? undefined,
+    borrowedUntil:      row.borrowed_until ? toDateOnly(row.borrowed_until) : undefined,
   };
 }
 

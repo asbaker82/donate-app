@@ -65,7 +65,7 @@ export default function ProfileScreen() {
       await updateAuthUser({ friends: currentUser.friends.filter(id => id !== friendId) });
     };
     if (Platform.OS === 'web') {
-      if (window.confirm('Remove this friend?')) doRemove();
+      doRemove();
     } else {
       Alert.alert('Remove Friend', 'Remove this person from your friends?', [
         { text: 'Cancel', style: 'cancel' },

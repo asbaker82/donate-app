@@ -108,7 +108,7 @@ export default function BrowseScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [itemDistances, setItemDistances] = useState<Record<string, number>>({});
+  const [itemDistances, setItemDistances] = useState<Record<string, number | null>>({});
 
   const friendItems = getFriendItems();
 
@@ -127,8 +127,11 @@ export default function BrowseScreen() {
         if (cancelled) break;
         if (item.id in itemDistances) continue;
         const coords = await geocodeAddress(item.pickupLocation);
-        if (coords && !cancelled) {
-          setItemDistances(prev => ({ ...prev, [item.id]: haversineMiles(userCoords, coords) }));
+        if (!cancelled) {
+          setItemDistances(prev => ({
+            ...prev,
+            [item.id]: coords ? haversineMiles(userCoords, coords) : null,
+          }));
         }
         // Nominatim rate limit: 1 req/sec
         await new Promise(r => setTimeout(r, 1100));
@@ -137,6 +140,7 @@ export default function BrowseScreen() {
     return () => { cancelled = true; };
   }, [userCoords, friendItems.length]);
 
+  // ── Action banners ────────────────────────────────────────────────────────
   const myTurn = items.filter(
     item =>
       item.status === 'claimed' &&
@@ -144,6 +148,58 @@ export default function BrowseScreen() {
       item.claimDeadline &&
       new Date(item.claimDeadline) > new Date()
   );
+
+  const pendingBorrowApprovals = items.filter(
+    item =>
+      item.donorId === currentUser.id &&
+      item.listingType === 'borrow' &&
+      item.borrowRequests.some(r => r.status === 'pending')
+  );
+
+  const needPickupConfirm = items.filter(
+    item =>
+      item.donorId === currentUser.id &&
+      item.listingType === 'give' &&
+      item.status === 'pending_pickup'
+  );
+
+  const needReturnConfirm = items.filter(
+    item =>
+      item.donorId === currentUser.id &&
+      item.listingType === 'borrow' &&
+      item.status === 'pending_return'
+  );
+
+  const actionBanners = [
+    myTurn.length > 0 && {
+      key: 'pickup',
+      icon: 'clock-o' as const,
+      color: '#F26B3A',
+      label: `${myTurn.length} item${myTurn.length > 1 ? 's' : ''} waiting for you to pick up`,
+      onPress: () => router.push({ pathname: '/items-list', params: { filter: 'claimed' } }),
+    },
+    pendingBorrowApprovals.length > 0 && {
+      key: 'borrow-requests',
+      icon: 'calendar-check-o' as const,
+      color: '#7BA7BC',
+      label: `${pendingBorrowApprovals.length} borrow request${pendingBorrowApprovals.length > 1 ? 's' : ''} waiting for your approval`,
+      onPress: () => router.push({ pathname: '/(tabs)/my-items', params: { tab: 'lending' } }),
+    },
+    needPickupConfirm.length > 0 && {
+      key: 'confirm-pickup',
+      icon: 'check-circle' as const,
+      color: '#7FA88A',
+      label: `${needPickupConfirm.length} pickup${needPickupConfirm.length > 1 ? 's' : ''} waiting for your confirmation`,
+      onPress: () => router.push({ pathname: '/(tabs)/my-items', params: { tab: 'listing' } }),
+    },
+    needReturnConfirm.length > 0 && {
+      key: 'confirm-return',
+      icon: 'undo' as const,
+      color: '#7BA7BC',
+      label: `${needReturnConfirm.length} return${needReturnConfirm.length > 1 ? 's' : ''} waiting for your confirmation`,
+      onPress: () => router.push({ pathname: '/(tabs)/my-items', params: { tab: 'lending' } }),
+    },
+  ].filter(Boolean) as { key: string; icon: React.ComponentProps<typeof FontAwesome>['name']; color: string; label: string; onPress: () => void }[];
 
   const scored = friendItems
     .map(item => ({ item, score: fuzzyScore(search, item) }))
@@ -159,7 +215,9 @@ export default function BrowseScreen() {
     .filter(({ item }) => {
       if (!maxMiles || !userCoords) return true;
       const dist = itemDistances[item.id];
-      return dist === undefined || dist <= maxMiles; // show while geocoding
+      if (dist === undefined) return true; // still geocoding, show optimistically
+      if (dist === null) return true;      // geocode failed, distance unknown, show
+      return dist <= maxMiles;
     })
     .sort((a, b) =>
       b.score !== a.score
@@ -216,18 +274,13 @@ export default function BrowseScreen() {
 
   return (
     <View style={styles.container}>
-      {myTurn.length > 0 && (
-        <Pressable
-          style={styles.banner}
-          onPress={() => router.push(`/item/${myTurn[0].id}`)}
-        >
-          <FontAwesome name="bell" size={14} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.bannerText}>
-            You have {myTurn.length} item{myTurn.length > 1 ? 's' : ''} waiting for pickup!
-          </Text>
+      {actionBanners.map(b => (
+        <Pressable key={b.key} style={[styles.banner, { backgroundColor: b.color }]} onPress={b.onPress}>
+          <FontAwesome name={b.icon} size={14} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={styles.bannerText}>{b.label}</Text>
           <FontAwesome name="chevron-right" size={12} color="#fff" />
         </Pressable>
-      )}
+      ))}
 
       {/* Search bar */}
       <View style={styles.searchRow}>
@@ -428,7 +481,7 @@ export default function BrowseScreen() {
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <SwipeableCard onDismiss={() => dismissItem(item.id)}>
-              <ItemCard item={item} onPress={() => { addToSearchHistory(search.trim()); router.push(`/item/${item.id}`); }} distance={itemDistances[item.id]} />
+              <ItemCard item={item} onPress={() => { addToSearchHistory(search.trim()); router.push(`/item/${item.id}`); }} distance={itemDistances[item.id] ?? undefined} />
             </SwipeableCard>
           )}
           contentContainerStyle={{ paddingBottom: 24, paddingTop: 8 }}

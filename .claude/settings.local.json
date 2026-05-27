@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npx tsc *)",
+      "PowerShell(cd \"c:\\\\Users\\\\Adam\\\\Desktop\\\\Yoink It\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"profile\\\\.tsx|add-friends|index\\\\.tsx\" })"
     ]
   }
 }

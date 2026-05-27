@@ -86,6 +86,9 @@ Path alias `@/` maps to the repo root.
 - **Cancel borrow request**: `cancelBorrowRequest` removes the request from the array entirely. This differs from `rejectBorrowRequest` (donor action) which marks status as `'rejected'` and keeps it in the array.
 - **Swipe-to-dismiss**: `SwipeableCard` wraps each `ItemCard` in Browse. Swiping left past 100 px (or fast flick) calls `dismissItem` from AppContext. Dismissed items are filtered out of `sortedFiltered` before the FlatList. The trash icon in `CustomTabBar` opens a restore sheet; it only appears when `dismissed.size > 0`.
 - **Validation**: When creating or editing a listing, `claimPickupHours` must be less than the hours remaining until `disposalDate` — enforced in both `new.tsx` and `edit/[id].tsx`.
+- **Item detail countdown**: `app/item/[id].tsx` ticks a `now` state every 30 s. The "Pick Up Within" row shows `"Xd Xh Xm remaining"` while the claim is live, or `"Xd Xh window"` when unclaimed. When `claimDeadline` has passed and the item is still `claimed`, a donor-only expiry banner renders with an "Extend 1 Day" button (`updateItem` adds 24 h to `claimDeadline`). Auto-release is handled by `processExpiredClaims` in `AppContext`.
+- **Restrictions gate**: If `item.restrictions` is set and the viewer presses "Claim →", a `ConfirmSheet` intercepts, showing the restrictions text and asking for acceptance. `doClaimItem()` only fires if the user confirms.
+- **Picked-up give items**: Once `status === 'picked_up'`, the item detail hides all logistical rows (pickup, window, pickup-within, disposal, map card). The bottom CTA becomes plain text ("Picked up — enjoy!"). The SMS pre-fill becomes a thank-you note from donee first name to donor first name.
 - **Supabase constraint**: The `items.status` check constraint must include `'pending_pickup'`, `'borrowed'`, and `'pending_return'`. Migration for a live DB:
   ```sql
   ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_status_check;
@@ -100,6 +103,22 @@ Path alias `@/` maps to the repo root.
   ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_listing_type_check;
   ALTER TABLE public.items ADD CONSTRAINT items_listing_type_check CHECK (listing_type IN ('give','borrow'));
   ```
+
+### Notifications — `utils/notifications.ts`
+- `requestNotificationPermission()` — requests browser `Notification` permission; called on login in `AppContext`. Web-only; returns `false` on native.
+- `sendNotification(title, body)` — fires a browser notification if permission is granted.
+
+**Watcher pattern in `AppContext`**: A `useEffect` watches the `items` array for state transitions and fires notifications. Two refs prevent false positives:
+- `notifInitialisedRef` — skips the initial data load so no spurious notifications fire on mount.
+- `prevItemsRef` — snapshot of the previous `items` array; diffed on each render to detect genuine transitions (e.g. a borrow request going from `pending` → `approved`).
+
+Transitions that fire notifications: new pending borrow request on donor's item; donor's give item → `pending_pickup`; donor's borrow item → `pending_return`; donee's borrow request → `approved` or `rejected`.
+
+### Date utilities — `utils/dates.ts`
+Three helpers for calendar fields that store dates as `YYYY-MM-DD` strings:
+- `toDateOnly(value)` — slices an ISO timestamptz to `YYYY-MM-DD`.
+- `parseCalendarDate(value)` — returns a `Date` at local noon to avoid UTC-midnight off-by-one errors.
+- `formatCalendarDate(value, options?)` — formats a date string for display (defaults to `"May 26"` style).
 
 ### Sounds — `utils/sounds.ts`
 - `playClaimSound()` — celebratory C5→E5→G5 arpeggio on web via `AudioContext`; native builds a WAV buffer in memory and plays it via `expo-av` + `expo-file-system` (no bundled audio files).
@@ -142,6 +161,18 @@ Photo grids in `item/new.tsx`, `item/edit/[id].tsx`, and the thumbnail strip in 
 | `ImageCropModal` | **Web-only** circular crop modal. Injects a `<canvas>` imperatively into a `View` DOM node. Drag to pan, scroll/buttons to zoom. Used in `edit-profile.tsx` after image pick. |
 
 Both toast components use core RN `Animated` (not Reanimated) with `useNativeDriver: true`.
+
+### Action banners — `app/(tabs)/index.tsx`
+Up to four stacked banners appear above the feed, one per pending donor/donee action. Each banner navigates to the relevant screen:
+
+| Condition | Color | Destination |
+|---|---|---|
+| Donee has item in `pending_pickup` state | Orange | `/items-list?filter=claimed` |
+| Donor has borrow item with a `pending` borrow request | Sky blue | `/(tabs)/my-items?tab=lending` |
+| Donor has give item in `pending_pickup` (needs confirmation) | Sage | `/(tabs)/my-items?tab=listing` |
+| Donor has borrow item in `pending_return` (needs confirmation) | Sky blue | `/(tabs)/my-items?tab=lending` |
+
+The `?tab=` param is read by `my-items.tsx` via `useLocalSearchParams` and used as the initial tab state so the user lands on the right sub-tab.
 
 ### Browse screen filters — `app/(tabs)/index.tsx`
 Two-level filter system:

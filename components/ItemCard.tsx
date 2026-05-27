@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Item, CONDITION_LABELS } from '@/store/types';
 import { useApp } from '@/store/AppContext';
+import { formatCalendarDate } from '@/utils/dates';
 
 interface Props {
   item: Item;
@@ -95,7 +96,7 @@ export default function ItemCard({ item, onPress, distance }: Props) {
               <View style={styles.timeChip}>
                 <FontAwesome name="calendar" size={10} color="#718096" style={{ marginRight: 3 }} />
                 <Text style={styles.timeText}>
-                  Until {new Date(item.borrowedUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  Until {formatCalendarDate(item.borrowedUntil)}
                 </Text>
               </View>
             )}

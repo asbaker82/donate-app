@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,12 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useApp } from '@/store/AppContext';
 import { Item, DISPOSAL_METHOD_LABELS } from '@/store/types';
 import ItemCard from '@/components/ItemCard';
+import { formatCalendarDate } from '@/utils/dates';
 
 const TANGERINE = '#F26B3A';
 const TANG_DEEP = '#D8531F';
@@ -34,10 +35,30 @@ const TAB_ACTIVE: Record<string, { bg: string; text: string }> = {
 
 type Tab = 'listing' | 'claimed' | 'waitlisted' | 'lending';
 
+function formatTimeLeft(deadline: Date, now: Date): string {
+  const ms = deadline.getTime() - now.getTime();
+  if (ms <= 0) return '';
+  const totalMins = Math.floor(ms / 60000);
+  const days  = Math.floor(totalMins / 1440);
+  const hours = Math.floor((totalMins % 1440) / 60);
+  const mins  = totalMins % 60;
+  const parts: string[] = [];
+  if (days  > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins  > 0 || parts.length === 0) parts.push(`${mins}m`);
+  return parts.join(' ');
+}
+
 export default function MyItemsScreen() {
   const { items, getMyItems, deleteItem, markDisposed, confirmPickup, releaseClaim, getUserById, currentUser, approveBorrowRequest, rejectBorrowRequest, confirmBorrowReturn, markBorrowReturned } = useApp();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('listing');
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: Tab }>();
+  const [tab, setTab] = useState<Tab>(tabParam ?? 'listing');
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const myListings = getMyItems();
   const activeListings    = myListings.filter(i => i.status === 'available' || i.status === 'claimed' || i.status === 'pending_pickup');
@@ -207,6 +228,18 @@ export default function MyItemsScreen() {
             renderItem={({ item }) => (
               <View>
                 <ItemCard item={item} onPress={() => router.push(`/item/${item.id}`)} />
+                {item.status === 'claimed' && item.claimDeadline && (() => {
+                  const label = formatTimeLeft(new Date(item.claimDeadline), now);
+                  const expired = new Date(item.claimDeadline) <= now;
+                  return (
+                    <View style={styles.positionRow}>
+                      <FontAwesome name="clock-o" size={12} color={expired ? TANG_DEEP : BUTTER} style={{ marginRight: 6 }} />
+                      <Text style={[styles.positionText, { color: expired ? TANG_DEEP : INK }]}>
+                        {expired ? 'Pickup window expired' : `${label} to pick up`}
+                      </Text>
+                    </View>
+                  );
+                })()}
                 {item.status === 'pending_pickup' && (
                   <View style={styles.positionRow}>
                     <FontAwesome name="clock-o" size={12} color={MUTE} style={{ marginRight: 6 }} />
@@ -301,7 +334,7 @@ export default function MyItemsScreen() {
                         <FontAwesome name="refresh" size={11} color="#7A5C00" style={{ marginRight: 4 }} />
                         <Text style={styles.claimedByText}>
                           Borrowed by {getUserById(item.borrowedBy ?? '')?.name ?? 'someone'}
-                          {item.borrowedUntil ? ` until ${new Date(item.borrowedUntil + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                          {item.borrowedUntil ? ` until ${formatCalendarDate(item.borrowedUntil)}` : ''}
                         </Text>
                       </View>
                     )}

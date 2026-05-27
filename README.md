@@ -60,8 +60,12 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 
 **Claiming & waitlist**
 - Claim items directly; join a waitlist when already claimed
+- Items with restrictions show a confirmation sheet before claiming — donee must accept terms
 - Automatic waitlist promotion when a claim deadline passes
+- Live d/h/m pickup countdown on item detail for both donor and claimant
+- Donor expiry banner when pickup window passes — donor can extend by 1 day or let the claim auto-release
 - Two-party pickup confirmation — donee marks picked up, donor confirms; either party can release back to claimed
+- Once confirmed picked up, logistical details are hidden and the SMS pre-fill becomes a thank-you note from donee to donor
 - One-tap driving directions and Text Donor (SMS) from item detail
 - Pickup deadline shown in a slide-up toast after claiming
 
@@ -70,6 +74,7 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 - Friends submit date-range borrow requests via an inline range-selection calendar; can cancel pending requests
 - Donor approves or rejects inline; approving auto-rejects any overlapping pending requests
 - Two-party return confirmation — borrower marks returned, donor confirms
+- Borrower's item detail shows return deadline with live d/h/m countdown
 - Donors can block out unavailable date ranges (vacations, reservations, etc.)
 
 **My Items**
@@ -77,6 +82,7 @@ Any of these numbers skip OTP. For any other number, the OTP code is always **12
 - Waitlisted tab shows your queue position
 - Lending tab shows pending borrow requests with inline approve / decline, and active borrows with return confirmation
 - Donors can confirm pickup, dispose, or remove their own active listings
+- Action banners on the Browse screen surface all pending tasks across all four action types (pickup due, borrow request to review, pickup to confirm, return to confirm) with direct navigation to the relevant tab
 
 **Profile & social**
 - Add friends from device contacts or by browsing other app users
@@ -106,8 +112,10 @@ store/
 lib/
   queryClient.ts   TanStack QueryClient + AsyncStorage persister
 utils/
-  geocode.ts       Nominatim geocoding + Haversine distance
-  sounds.ts        Claim / waitlist sounds (AudioContext on web, expo-av WAV on native)
+  geocode.ts        Nominatim geocoding + Haversine distance
+  sounds.ts         Claim / waitlist sounds (AudioContext on web, expo-av WAV on native)
+  notifications.ts  Browser Notification API wrapper (web-only permission request + send)
+  dates.ts          Calendar date helpers (toDateOnly, parseCalendarDate, formatCalendarDate)
 supabase/
   schema.sql       Full DB schema with RLS policies
 ```
